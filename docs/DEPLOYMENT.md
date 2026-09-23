@@ -1,180 +1,195 @@
 # Deployment
 
-Getting A to Z Fitness OS onto a URL the gym owner can open from anywhere.
+One host, one push, no monthly fee.
 
-Two pieces deploy separately:
+| Piece | Where |
+|---|---|
+| The React app | Vercel — static files on a CDN |
+| The API | Vercel — one serverless function at `/api/*` |
+| The database | Supabase, already live |
 
-| Piece | What it is | Where it goes |
-|---|---|---|
-| `apps/web` | The React app | Vercel (static files + CDN) |
-| `apps/api` | The Express server | Render (a long-running Node process) |
-
-The database is already on Supabase and does not move.
-
-**Why two hosts.** Vercel serves static files brilliantly and sleeps nothing,
-but it runs serverless functions, not a persistent server — the background
-workers (expiry sync, notification retries) need a process that stays alive.
-Render gives that. Both have usable free tiers.
+Both halves come from the same repo and deploy together. `git push` ships
+everything.
 
 ---
 
-## Before you start
+## Why there is still an API at all
 
-- A GitHub account with the repo pushed (already done)
-- The Supabase connection strings from `.env`
-- 30–40 minutes
+The app talks to Supabase through a small server rather than directly from
+the browser. Three things make that necessary, and none of them is a
+preference:
 
-**Free tiers sleep.** A Render free service shuts down after 15 minutes idle
-and takes ~30 seconds to wake. Fine for a demo; not for a gym at 6am. See
-*Going to production* at the end.
+**Secrets.** `SMTP_PASSWORD` and `WHATSAPP_ACCESS_TOKEN` would ship inside
+the JavaScript bundle. Anyone who opened the site could read them and send
+email as the gym — Google would suspend the account within days.
 
----
+**Gap-free receipt numbers.** The sequence is allocated under a database row
+lock, so two receptionists taking payment in the same second get `0007` and
+`0008`. Read-then-write from two browsers gives both of them `0007`, and
+you find out when the accountant asks which ₹4,000 is which.
 
-## 1. Deploy the API to Render
+**The audit trail.** An entry the client can choose not to write is not an
+audit trail.
 
-1. **render.com** → sign in with GitHub → **New** → **Web Service**
-2. Connect `ahmedali-aihub/Gym-managment-Software`
-3. Settings:
-
-   | Field | Value |
-   |---|---|
-   | Name | `azf-api` |
-   | Region | **Singapore** — closest to Hyderabad |
-   | Branch | `main` |
-   | Root Directory | *(leave blank — it is a monorepo)* |
-   | Build Command | `npm install && npm run build --workspace=packages/shared && npx prisma generate --schema apps/api/prisma/schema.prisma && npm run build --workspace=apps/api` |
-   | Start Command | `node apps/api/dist/server.js` |
-
-   The build command looks long because order matters: `@azf/shared` must
-   compile before the API imports it, and the Prisma client must be
-   generated before the API can talk to the database.
-
-4. **Environment** → add every variable from your local `.env`, with these
-   changes:
-
-   ```
-   NODE_ENV=production
-   PORT=10000                       # Render provides this; leave it
-   WEB_BASE_URL=https://<your-vercel-url>   # fill in after step 2
-   API_BASE_URL=https://azf-api.onrender.com
-   ```
-
-   Everything else — `DATABASE_URL`, `DIRECT_URL`, `JWT_*`, `SMTP_*`,
-   `EMAIL_*`, `GYM_*` — copies across unchanged.
-
-   **Generate NEW JWT secrets for production.** Reusing the development ones
-   means any token ever issued locally works against the live system:
-
-   ```bash
-   node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
-   ```
-
-5. **Create Web Service.** First build takes ~5 minutes.
-
-6. Check the logs for:
-
-   ```
-   Database connected
-   Email provider: smtp — connected to smtp.gmail.com
-   A to Z Fitness API listening
-   ```
+Everything else — reading members, filtering, charts — could run in the
+browser. It goes through the same API because one code path is cheaper to
+maintain than two.
 
 ---
 
-## 2. Deploy the web app to Vercel
+## 1. Import the project
 
-1. **vercel.com** → **Add New** → **Project** → import the same repo
-2. Settings:
-
-   | Field | Value |
-   |---|---|
-   | Framework Preset | **Vite** |
-   | Root Directory | `apps/web` |
-   | Build Command | `cd ../.. && npm install && npm run build --workspace=packages/shared && npm run build --workspace=apps/web` |
-   | Output Directory | `dist` |
-
-3. **Environment Variables**:
-
-   ```
-   VITE_DEMO_MODE=false
-   VITE_API_URL=https://azf-api.onrender.com/api
-   ```
-
-   `VITE_DEMO_MODE=false` is not optional. With it on the app serves
-   fixtures and writes nothing — the failure looks like "the software
-   forgets everything".
-
-   Vite inlines these AT BUILD TIME. Changing one later needs a redeploy,
-   not just a restart.
-
-4. **Deploy**, then copy the URL it gives you.
+1. **vercel.com** → **Add New** → **Project**
+2. Import `ahmedali-aihub/Gym-managment-Software`
+3. Leave every build setting **as it is**. `vercel.json` in the repo root
+   already sets the build command, the output directory and the `/api/*`
+   routing.
 
 ---
 
-## 3. Close the loop
+## 2. Environment variables
 
-Back in Render → Environment → set `WEB_BASE_URL` to the Vercel URL, and
-save. Render restarts automatically.
+Add these in **Settings → Environment Variables**. Copy the values from your
+local `.env`.
 
-This is what the API's CORS check uses. Until it matches, every request
-from the browser is rejected and the app looks broken with no obvious
-reason.
+```
+NODE_ENV=production
+
+DATABASE_URL=<Supabase transaction pooler, port 6543>
+DIRECT_URL=<Supabase session pooler, port 5432>
+
+JWT_ACCESS_SECRET=<generate a NEW one>
+JWT_REFRESH_SECRET=<generate a NEW one>
+JWT_ACCESS_EXPIRES_IN=15m
+JWT_REFRESH_EXPIRES_IN=30d
+BCRYPT_ROUNDS=12
+
+EMAIL_PROVIDER=smtp
+EMAIL_ENABLED=true
+EMAIL_FROM_NAME=A to Z Fitness
+EMAIL_FROM_ADDRESS=<your gmail>
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=<your gmail>
+SMTP_PASSWORD=<16-char app password>
+
+WHATSAPP_PROVIDER=mock
+WHATSAPP_ENABLED=true
+
+GYM_NAME=A to Z Fitness
+GYM_ADDRESS_LINE1=Mehdipatnam
+GYM_ADDRESS_LINE2=Hyderabad, Telangana 500028
+GYM_PHONE=<gym phone>
+GYM_EMAIL=<gym email>
+GYM_STATE_CODE=36
+
+CRON_SECRET=<generate one>
+VITE_DEMO_MODE=false
+```
+
+**Generate fresh JWT secrets for production.** Reusing the development ones
+means any token ever issued on your laptop authenticates against the live
+system:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+```
+
+**`VITE_DEMO_MODE=false` is not optional.** With it on, the app serves
+sample data and writes nothing. The failure looks like "the software forgets
+everything".
+
+**`VITE_API_URL` is deliberately NOT set.** The app and the API share an
+origin here, so the default `/api` is correct. Setting it would point the
+app at a host that does not exist.
+
+---
+
+## 3. Deploy
+
+Press **Deploy**. First build takes 3–5 minutes.
 
 ---
 
 ## 4. Verify, in this order
 
-Open the Vercel URL and work down. Stop at the first failure — each step
-depends on the one before.
+Open the URL and work down. Stop at the first failure — each step depends on
+the one before.
 
-1. [ ] The login page loads (not a blank screen)
+1. [ ] The login page loads, not a blank screen
 2. [ ] Log in as the owner
 3. [ ] The dashboard shows real member counts, and **no demo-mode banner**
 4. [ ] Open a member — the profile and history load
-5. [ ] Register a test member → receipt number appears
+5. [ ] Register a test member → a receipt number appears
 6. [ ] The welcome email arrives with the PDF attached
 7. [ ] Download the report PDF
 8. [ ] **Delete the test member**
 
-**A blank page** almost always means `VITE_API_URL` is wrong or missing.
-Open the browser console: a CORS error means step 3 was skipped.
+**A blank page** usually means the build failed — check the Vercel build log.
 
-**Logged out after ~15 minutes** would mean the refresh cookie is not
-crossing hosts. Two things make that work, and both are already in the
-code: `sameSite: 'none'` in production (a browser sends a cookie cross-site
-under no other value), and `secure: true`, which is why both hosts must be
-HTTPS. Vercel and Render both are by default.
+**"Demo mode" banner showing** means `VITE_DEMO_MODE` was not set to
+`false` before the build. Vite inlines it at BUILD time, so change it and
+redeploy; a restart alone does nothing.
 
 ---
 
-## Going to production
+## Scheduled work
 
-The free tiers are fine for showing the client. Before the gym depends on
-it, three things change:
+Two jobs run on Vercel Cron, configured in `vercel.json`:
 
-**Render Starter, ~$7/month.** The free service sleeps after 15 minutes
-idle. A receptionist opening the app at 6am waits 30 seconds for it to
-wake, every morning.
+| Job | When | Why |
+|---|---|---|
+| `/api/cron/sync-expiry` | Daily, 01:00 | Marks lapsed memberships expired. Without it, "active members" keeps counting everyone who lapsed overnight. |
+| `/api/cron/retry-notifications` | Every 30 min | Retries failed emails and WhatsApp messages. |
 
-**Supabase Pro, ~$25/month.** The free tier has NO automatic backups. For a
-gym's only record of who has paid, that is not a position to be in. See
-`HANDOVER.md`.
+Both refuse any request without `CRON_SECRET` as a bearer token — they are
+public URLs, and an open retry endpoint is something to hammer.
 
-**A custom domain.** `gym.atozfitness.in` rather than
-`azf-web-xyz.vercel.app`. Both hosts add one free; it is a DNS record.
+**Vercel Cron needs a Pro plan.** On the free tier the endpoints exist but
+nothing calls them: memberships stay marked active after they lapse, and
+failed notifications are not retried. For a demo that is fine. Before the
+gym relies on it, either upgrade or point a free scheduler
+(cron-job.org) at those two URLs with the same bearer token.
+
+---
+
+## Member photos — read this before going live
+
+Photos are written to the server's local disk. **A serverless function has
+no persistent disk**, so on Vercel they are lost as soon as the function
+instance is recycled — often within minutes.
+
+For a demo where nobody uploads a photo, that does not come up. Before real
+members, they move to Supabase Storage. Roughly an hour of work; ask when
+you want it.
 
 ---
 
 ## Redeploying
 
-Both hosts watch `main`. `git push` deploys automatically.
+Vercel watches `main`. `git push` deploys.
 
-**A schema change needs a migration**, and neither host runs one for you:
+**A schema change needs a migration first**, and Vercel does not run one:
 
 ```bash
 # locally, pointed at the production database
 npx prisma migrate deploy --workspace=apps/api
 ```
 
-Run it BEFORE pushing code that depends on the new column, or the live API
-will query a column that does not exist yet.
+Run it BEFORE pushing code that uses the new column, or the live API queries
+a column that does not exist.
+
+---
+
+## Going to production
+
+The free tier is fine for showing the client. Before the gym depends on it:
+
+**Supabase Pro, ~$25/month.** The free tier has NO automatic backups. For a
+gym's only record of who has paid, that is not a position to be in.
+
+**Vercel Pro, ~$20/month** — only if you want the cron jobs running on
+Vercel. A free external scheduler does the same job.
+
+**A custom domain.** `gym.atozfitness.in` rather than the Vercel URL. Free
+on both; it is a DNS record.

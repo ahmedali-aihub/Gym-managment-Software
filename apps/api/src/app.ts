@@ -12,6 +12,7 @@ import {
 } from './middleware/error.middleware.js';
 import { attendanceRoutes } from './modules/attendance/attendance.routes.js';
 import { authRoutes } from './modules/auth/auth.routes.js';
+import { cronRoutes } from './modules/cron/cron.routes.js';
 import { dashboardRoutes } from './modules/dashboard/dashboard.routes.js';
 import { expensesRoutes } from './modules/expenses/expenses.routes.js';
 import { invoicesRoutes } from './modules/invoices/invoices.routes.js';
@@ -103,6 +104,9 @@ export function createApp(): Application {
   app.use('/api/members', membersRoutes);
   app.use('/api/import', importRoutes);
   app.use('/api/notifications', notificationsRoutes);
+  // Scheduled work. Authenticated by CRON_SECRET, not a session — see the
+  // note in cron.routes.ts.
+  app.use('/api/cron', cronRoutes);
   app.use('/api/plans', plansRoutes);
   app.use('/api/memberships', membershipsRoutes);
   app.use('/api/payments', paymentsRoutes);

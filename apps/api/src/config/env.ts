@@ -154,6 +154,10 @@ const envSchema = z
     UPLOAD_DIR: z.string().default('./uploads'),
     MAX_UPLOAD_BYTES: z.coerce.number().int().default(5_242_880),
 
+    /// Shared secret for the Vercel Cron endpoints. Absent means cron is
+    /// not in use and those routes refuse every request.
+    CRON_SECRET: z.string().optional(),
+
     // Rate limiting
     RATE_LIMIT_WINDOW_MS: z.coerce.number().int().default(900_000),
     RATE_LIMIT_MAX: z.coerce.number().int().default(300),

@@ -582,7 +582,29 @@ should show. The caption switches between "Plans sold · This month" and
 
 ## Deployment — see docs/DEPLOYMENT.md
 
-Vercel (web) + Render (API) + Supabase (database, already live).
+ONE host. Vercel serves the React app as static files and the whole Express
+API as a single serverless function at `/api/*`. Supabase holds the data.
+`git push` deploys both halves together.
+
+**The API was NOT removed, and here is why.** Three things cannot run in a
+browser: SMTP_PASSWORD and WHATSAPP_ACCESS_TOKEN would ship in the bundle
+for anyone to read; gap-free receipt numbers need a database row lock, and
+read-then-write from two browsers issues the same number twice; and an
+audit entry the client can decline to write is not an audit trail.
+
+**Background timers do not exist in serverless**, so the two workers moved
+to Vercel Cron endpoints under `/api/cron`. Both refuse any request without
+`CRON_SECRET` as a bearer token — they are public URLs. `server.ts` still
+runs them on timers when the API runs as a long-lived process, and both
+paths call the same service methods so neither can drift.
+
+**Vercel Cron needs a Pro plan.** On free, the endpoints exist but nothing
+calls them: lapsed memberships stay marked active. A free external
+scheduler pointed at the same two URLs works identically.
+
+**The cookie went back to `sameSite: 'lax'`.** Same-origin again, so the
+cross-site 'none' is unnecessary — and 'lax' blocks the CSRF-shaped
+requests that 'none' permits.
 
 **Two things were hardcoded for local development and would have broken a
 deploy.** Both are fixed:

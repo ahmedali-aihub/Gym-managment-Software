@@ -21,21 +21,17 @@ import { parseDuration } from './auth.utils.js';
 const REFRESH_COOKIE = 'azf_refresh';
 
 function refreshCookieOptions() {
-  // Deployed, the web app and the API sit on different hosts (Vercel and
-  // Render), which makes every refresh a CROSS-SITE request. 'lax' blocks
-  // the cookie there, so the user is silently logged out the moment the
-  // 15-minute access token expires — and the failure looks like a random
-  // session drop rather than a cookie policy.
+  // 'lax' throughout, because the app and the API deploy to ONE host: the
+  // web app is served from /, the API from /api, so a refresh is never a
+  // cross-site request. 'lax' blocks the cross-site POSTs that CSRF relies
+  // on, which 'none' would permit — so the single-host deployment buys back
+  // the stronger cookie policy for free.
   //
-  // 'none' is the only value a browser will send cross-site, and it REQUIRES
-  // secure: true, so this pairs strictly with HTTPS. Same-origin development
-  // keeps 'lax', which is the stronger default.
-  const crossSite = isProduction;
-
+  // Splitting the two across hosts again would need 'none' plus secure.
   return {
     httpOnly: true,
     secure: isProduction,
-    sameSite: crossSite ? ('none' as const) : ('lax' as const),
+    sameSite: 'lax' as const,
     path: '/api/auth',
     maxAge: parseDuration(process.env.JWT_REFRESH_EXPIRES_IN ?? '30d'),
   };

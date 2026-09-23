@@ -1,0 +1,19 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm install && npm run build --workspace=packages/shared && npx prisma generate --schema apps/api/prisma/schema.prisma && npm run build --workspace=apps/web",
+  "outputDirectory": "apps/web/dist",
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/sync-expiry",
+      "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/cron/retry-notifications",
+      "schedule": "*/30 * * * *"
+    }
+  ]
+}
