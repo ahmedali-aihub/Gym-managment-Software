@@ -2,6 +2,7 @@ import {
   FITNESS_GOAL_LABELS,
   MEMBER_STATUS_LABELS,
   MemberStatus,
+  Role,
   formatDate,
   formatINR,
   formatPhone,
@@ -10,6 +11,7 @@ import {
   type MemberStats,
 } from '@azf/shared';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/features/auth/auth-context';
 import { motion } from 'framer-motion';
 import {
   ChevronLeft,
@@ -19,6 +21,7 @@ import {
   Phone,
   Search,
   SlidersHorizontal,
+  Upload,
   UserPlus,
   Users,
   X,
@@ -91,6 +94,8 @@ const STATUS_VARIANTS: Record<
  */
 export function MembersPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { hasRole } = useAuth();
+  const canImport = hasRole(Role.OWNER, Role.MANAGER);
   const navigate = useNavigate();
 
   const page = Number(searchParams.get('page')) || 1;
@@ -262,6 +267,18 @@ export function MembersPage() {
             <Button variant="outline" onClick={() => setRemindersOpen(true)}>
               <MessageSquare />
               Send reminders
+            </Button>
+          )}
+
+          {/* Owner and manager only, matching the API. Showing this to a
+              receptionist would hand them a button that 403s. */}
+          {canImport && (
+            <Button
+              variant="outline"
+              onClick={() => navigate('/members/import')}
+            >
+              <Upload />
+              Import
             </Button>
           )}
 
