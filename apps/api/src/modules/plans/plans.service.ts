@@ -204,12 +204,25 @@ class PlansService {
   }
 
   /** Member counts per plan — powers the dashboard's plan-distribution chart. */
-  async getDistribution(): Promise<
-    Array<{ planId: string; planName: string; count: number }>
-  > {
+  /**
+   * Which plans the business is on.
+   *
+   * WITHOUT a range: the live mix — what the currently ACTIVE members hold.
+   * That answers "what does the member base look like today?".
+   *
+   * WITH a range: what was SOLD in that window, by membership start date,
+   * whatever its status is now. A membership sold in March and since
+   * expired still counts as a March sale — filtering it out would make past
+   * periods shrink every time you looked at them.
+   */
+  async getDistribution(
+    range?: { from: Date; to: Date },
+  ): Promise<Array<{ planId: string; planName: string; count: number }>> {
     const grouped = await prisma.membership.groupBy({
       by: ['planId'],
-      where: { status: 'ACTIVE' },
+      where: range
+        ? { startDate: { gte: range.from, lte: range.to } }
+        : { status: 'ACTIVE' },
       _count: { _all: true },
     });
 

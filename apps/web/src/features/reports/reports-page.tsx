@@ -312,7 +312,11 @@ export function ReportsPage() {
 
         <ReportCard
           title="Plan mix"
-          description="Active memberships, most popular first"
+          description={
+            period === 'all'
+              ? 'Active memberships, most popular first'
+              : `Plans sold${scopeLabel ? ` · ${scopeLabel}` : ''}, most popular first`
+          }
           loading={isLoading}
         >
           {data && data.planDistribution.length > 0 && (

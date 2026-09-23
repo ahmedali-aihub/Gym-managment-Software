@@ -563,3 +563,19 @@ from the gym.
 **A password change needs an API restart.** The SMTP credential is read at
 boot; editing `.env` while the server runs leaves the old one in memory.
 That is what caused the one DEAD welcome email — not a code fault.
+
+## Plan mix follows the report filter
+
+It was the one chart that did not. Revenue, member growth and payment modes
+were all scoped; `getDistribution()` took no range and always counted
+currently-ACTIVE memberships, so it showed the same 94 members whatever
+period was selected — a chart that looked filtered and was not.
+
+**With a range it now counts memberships SOLD in that window, by start
+date, whatever their status is now.** A membership sold in March and since
+expired still counts as a March sale; filtering by current status would make
+past periods shrink every time you looked at them.
+
+**Without a range it keeps the live active mix**, which is what "All time"
+should show. The caption switches between "Plans sold · This month" and
+"Active memberships" so the chart always says which it is.
