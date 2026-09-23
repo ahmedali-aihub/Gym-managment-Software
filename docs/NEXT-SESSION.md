@@ -537,3 +537,29 @@ not.
 
 **Imported members are tagged in `notes`** with what the old system was
 missing, so the front desk sees it when the member is standing there.
+
+## Notifications — email + WhatsApp, SMS opt-in
+
+**Gmail SMTP is LIVE.** Real emails send from theahmedalii82@gmail.com.
+Verified end to end: a registration sent the welcome email with the receipt
+PDF attached, and Gmail accepted it.
+
+**Registration now sends WhatsApp + email automatically; SMS is a checkbox,
+off by default.** The registration form previously hardcoded
+`sendWelcomeSms: true`, which overrode the schema default — a form value
+always wins over a schema default, so both had to change.
+
+**`/notifications/reminders` sends one reminder over the channels the owner
+picks.** Expiry or dues, any combination of WhatsApp / email / SMS.
+Channels fail INDEPENDENTLY and the response names what happened per
+channel per member: "42 reminders sent" is not a useful answer when eleven
+went nowhere. A member with no email is reported as `skipped`, not failed —
+that tells the owner who to ask for an address.
+
+**Email and WhatsApp retry workers now run.** Only SMS retried before, so a
+message that failed once sat as FAILED forever and the member never heard
+from the gym.
+
+**A password change needs an API restart.** The SMTP credential is read at
+boot; editing `.env` while the server runs leaves the old one in memory.
+That is what caused the one DEAD welcome email — not a code fault.

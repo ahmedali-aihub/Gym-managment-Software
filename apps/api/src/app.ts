@@ -18,6 +18,7 @@ import { invoicesRoutes } from './modules/invoices/invoices.routes.js';
 import { leadsRoutes } from './modules/leads/leads.routes.js';
 import { importRoutes } from './modules/import/import.routes.js';
 import { membersRoutes } from './modules/members/members.routes.js';
+import { notificationsRoutes } from './modules/notifications/notifications.routes.js';
 import { paymentsRoutes } from './modules/payments/payments.routes.js';
 import {
   membershipsRoutes,
@@ -101,6 +102,7 @@ export function createApp(): Application {
   app.use('/api/dashboard', dashboardRoutes);
   app.use('/api/members', membersRoutes);
   app.use('/api/import', importRoutes);
+  app.use('/api/notifications', notificationsRoutes);
   app.use('/api/plans', plansRoutes);
   app.use('/api/memberships', membershipsRoutes);
   app.use('/api/payments', paymentsRoutes);

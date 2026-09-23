@@ -16,6 +16,8 @@ import {
   Check,
   ChevronDown,
   IndianRupee,
+  Mail,
+  MessageCircle,
   Phone,
   Plus,
   User,
@@ -110,7 +112,7 @@ export function RegisterMemberPage() {
       amountPaidRupees: '',
       paymentMode: 'CASH',
       reference: '',
-      sendWelcomeSms: true,
+      sendWelcomeSms: false,
       email: '',
       dateOfBirth: '',
       gender: '',
@@ -460,17 +462,42 @@ export function RegisterMemberPage() {
               </div>
             )}
 
-            <label className="flex cursor-pointer items-center gap-2.5 text-[13px]">
-              <Checkbox
-                checked={watch('sendWelcomeSms')}
-                onCheckedChange={(checked) =>
-                  setValue('sendWelcomeSms', checked === true)
-                }
-              />
-              <span className="text-muted-foreground">
-                Send welcome SMS with member ID and plan details
-              </span>
-            </label>
+            {/* Email and WhatsApp always go out — they cost nothing and
+                need no registration. Only SMS is a choice, because Indian
+                transactional SMS needs DLT approval to deliver at all. */}
+            <div className="rounded-xl bg-muted/40 px-3.5 py-3">
+              <p className="text-[13px] font-medium">
+                This member will automatically receive
+              </p>
+              <ul className="mt-1.5 space-y-1 text-[12px] text-muted-foreground">
+                <li className="flex items-center gap-2">
+                  <MessageCircle className="size-3.5 shrink-0" />
+                  WhatsApp with their member ID, plan and expiry date
+                </li>
+                <li className="flex items-center gap-2">
+                  <Mail className="size-3.5 shrink-0" />
+                  Email with the receipt PDF attached
+                  <span className="text-muted-foreground/70">
+                    (if an email address is given)
+                  </span>
+                </li>
+              </ul>
+
+              <label className="mt-3 flex cursor-pointer items-center gap-2.5 border-t border-border pt-2.5 text-[13px]">
+                <Checkbox
+                  checked={watch('sendWelcomeSms')}
+                  onCheckedChange={(checked) =>
+                    setValue('sendWelcomeSms', checked === true)
+                  }
+                />
+                <span className="text-muted-foreground">
+                  Also send an SMS
+                  <span className="ml-1 text-muted-foreground/70">
+                    — needs DLT registration to deliver
+                  </span>
+                </span>
+              </label>
+            </div>
           </CardContent>
         </Card>
 

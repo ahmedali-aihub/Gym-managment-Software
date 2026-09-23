@@ -4,8 +4,10 @@ import { env } from './config/env.js';
 import { logger } from './lib/logger.js';
 import { connectDatabase, disconnectDatabase } from './lib/prisma.js';
 import { membersService } from './modules/members/members.service.js';
+import { emailService } from './services/email/email.service.js';
 import { verifyEmailProvider } from './services/email/providers/index.js';
 import { verifyWhatsAppProvider } from './services/whatsapp/providers/index.js';
+import { whatsappService } from './services/whatsapp/whatsapp.service.js';
 import { verifySmsProvider } from './services/sms/providers/index.js';
 import { smsService } from './services/sms/sms.service.js';
 import { ensureUploadDirectories } from './services/storage/photo.service.js';
@@ -39,6 +41,25 @@ function startBackgroundWorkers(): void {
         logger.error({ err: error }, 'SMS status sync failed');
       });
     }, STATUS_SYNC_INTERVAL_MS),
+  );
+
+  // Email and WhatsApp retry on the same cadence as SMS. Without these, a
+  // message that failed once — a Gmail hiccup, a rate limit — sat in the
+  // queue as FAILED forever and the member simply never heard from the gym.
+  timers.push(
+    setInterval(() => {
+      void emailService.processRetryQueue().catch((error: unknown) => {
+        logger.error({ err: error }, 'Email retry worker failed');
+      });
+    }, SMS_RETRY_INTERVAL_MS),
+  );
+
+  timers.push(
+    setInterval(() => {
+      void whatsappService.processRetryQueue().catch((error: unknown) => {
+        logger.error({ err: error }, 'WhatsApp retry worker failed');
+      });
+    }, SMS_RETRY_INTERVAL_MS),
   );
 
   // Without this, "active members" silently includes everyone whose

@@ -24,7 +24,7 @@ import {
   CreditCard,
   Mail,
   MapPin,
-  MessageSquare,
+  Send,
   Phone,
   History,
   QrCode,
@@ -52,7 +52,8 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { RecordPaymentDialog } from '@/features/payments/record-payment-dialog';
 import { api, getErrorMessage } from '@/lib/api-client';
-import { FreezeDialog, SendSmsDialog } from './member-dialogs';
+import { FreezeDialog } from './member-dialogs';
+import { NotifyDialog } from './notify-dialog';
 import { RenewDialog, UnfreezeDialog } from './renew-dialog';
 import { cn } from '@/lib/utils';
 
@@ -361,8 +362,8 @@ export function MemberProfilePage() {
               variant="outline"
               onClick={() => setSmsOpen(true)}
             >
-              <MessageSquare />
-              Send SMS
+              <Send />
+              Send reminder
             </Button>
 
             <Button
@@ -619,7 +620,7 @@ export function MemberProfilePage() {
         balanceDuePaise={data.balance.balanceDuePaise}
       />
 
-      <SendSmsDialog
+      <NotifyDialog
         open={smsOpen}
         onOpenChange={setSmsOpen}
         member={data}
