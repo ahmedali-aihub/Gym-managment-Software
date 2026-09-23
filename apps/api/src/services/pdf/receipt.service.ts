@@ -173,7 +173,9 @@ export async function generateReceiptPdf(invoiceId: string): Promise<{
     size: 'A4',
     margin: PAGE_MARGIN,
     info: {
-      Title: invoice.invoiceNumber,
+      // Not the document number: the filename and the PDF title are both
+      // visible to the member, and the number is deliberately not shown.
+      Title: `${gymConfig.name} — ${invoice.isGstInvoice ? 'Tax Invoice' : 'Receipt'}`,
       Author: gymConfig.name,
       Subject: invoice.isGstInvoice ? 'Tax Invoice' : 'Payment Receipt',
     },
@@ -246,20 +248,14 @@ export async function generateReceiptPdf(invoiceId: string): Promise<{
       { width, align: 'right' },
     );
 
-  doc
-    .fillColor(COLORS.ink)
-    .fontSize(10)
-    .font('Helvetica-Bold')
-    .text(invoice.invoiceNumber, PAGE_MARGIN, y + 22, {
-      width,
-      align: 'right',
-    });
-
+  // No document number is printed. The number still exists in the database
+  // and is gap-free, but the gym does not want it on the member's copy; the
+  // date moves up into the space it left.
   doc
     .fillColor(COLORS.muted)
     .fontSize(9)
     .font('Helvetica')
-    .text(formatDate(invoice.issuedAt), PAGE_MARGIN, y + 36, {
+    .text(formatDate(invoice.issuedAt), PAGE_MARGIN, y + 22, {
       width,
       align: 'right',
     });
@@ -551,7 +547,11 @@ export async function generateReceiptPdf(invoiceId: string): Promise<{
   doc.end();
 
   const buffer = await done;
-  const filename = `${invoice.invoiceNumber.replace(/\//g, '-')}.pdf`;
+  // Named by member and date rather than document number, so a member
+  // downloading two receipts gets two distinguishable files.
+  const memberCode = member?.memberId ?? 'member';
+  const issued = formatDate(invoice.issuedAt).replace(/\//g, '-');
+  const filename = `receipt-${memberCode}-${issued}.pdf`;
 
   log.debug({ invoiceId, filename }, 'Receipt PDF generated');
 

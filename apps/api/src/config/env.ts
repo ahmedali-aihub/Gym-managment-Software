@@ -151,6 +151,12 @@ const envSchema = z
     RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
 
     // Uploads
+    //
+    // SUPABASE_SERVICE_ROLE_KEY bypasses row-level security, so it is
+    // server-only and deliberately NOT prefixed VITE_ — Vite cannot bundle
+    // it even by accident. Without it, photos fall back to local disk.
+    SUPABASE_URL: z.string().url().optional(),
+    SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
     UPLOAD_DIR: z.string().default('./uploads'),
     MAX_UPLOAD_BYTES: z.coerce.number().int().default(5_242_880),
 

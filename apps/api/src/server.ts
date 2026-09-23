@@ -8,6 +8,7 @@ import { emailService } from './services/email/email.service.js';
 import { verifyEmailProvider } from './services/email/providers/index.js';
 import { verifyWhatsAppProvider } from './services/whatsapp/providers/index.js';
 import { whatsappService } from './services/whatsapp/whatsapp.service.js';
+import { ensurePhotoBucket } from './services/storage/supabase-storage.js';
 import { verifySmsProvider } from './services/sms/providers/index.js';
 import { smsService } from './services/sms/sms.service.js';
 import { ensureUploadDirectories } from './services/storage/photo.service.js';
@@ -81,6 +82,7 @@ async function bootstrap(): Promise<void> {
   await verifySmsProvider();
   await verifyEmailProvider();
   await verifyWhatsAppProvider();
+  await ensurePhotoBucket();
 
   const app = createApp();
 

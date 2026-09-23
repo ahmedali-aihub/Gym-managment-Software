@@ -465,7 +465,7 @@ export function MemberProfilePage() {
                                   }
                                   className="underline underline-offset-2 transition-colors hover:text-primary"
                                 >
-                                  {payment.invoice.invoiceNumber}
+                                  Receipt
                                 </button>
                               </>
                             )}

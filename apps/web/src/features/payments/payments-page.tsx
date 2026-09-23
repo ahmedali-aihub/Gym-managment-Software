@@ -348,11 +348,6 @@ export function PaymentsPage() {
                     <div className="tabular font-semibold text-success">
                       {formatINR(payment.amountPaise, { showDecimals: false })}
                     </div>
-                    {payment.invoice && (
-                      <div className="truncate font-mono text-[10px] text-muted-foreground">
-                        {payment.invoice.invoiceNumber}
-                      </div>
-                    )}
                   </div>
                 </motion.div>
               ))}

@@ -169,11 +169,15 @@ describe('generateReceiptPdf', () => {
     expect(buffer.byteLength).toBeGreaterThan(2000);
   });
 
-  it('names the file after the receipt number, filesystem-safe', async () => {
+  it('names the file by member and date, not by document number', async () => {
+    // The document number is deliberately not shown to the member, so it
+    // cannot appear in a filename they can see either. Member code plus
+    // date still makes two downloads distinguishable.
     const { filename } = await generateReceiptPdf('inv_1');
 
-    // Slashes in RCPT/2026-27/0001 would create directories.
-    expect(filename).toBe('RCPT-2026-27-0001.pdf');
+    expect(filename).toBe('receipt-AZF-2026-0042-19-09-2026.pdf');
+    expect(filename).not.toContain('RCPT');
+    // Slashes from the date would create directories.
     expect(filename).not.toContain('/');
   });
 
@@ -241,7 +245,7 @@ describe('generateReceiptPdf', () => {
 
     // Older rows may predate the snapshot column; a receipt must still print.
     await expect(generateReceiptPdf('inv_1')).resolves.toMatchObject({
-      filename: 'RCPT-2026-27-0001.pdf',
+      filename: 'receipt-AZF-2026-0042-19-09-2026.pdf',
     });
   });
 });

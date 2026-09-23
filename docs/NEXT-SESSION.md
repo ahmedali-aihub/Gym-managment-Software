@@ -623,3 +623,35 @@ deploy.** Both are fixed:
 **The API needs a long-running process**, not serverless: the background
 workers (expiry sync, notification retries) must stay alive. That is why
 Render rather than Vercel functions.
+
+## Member photos go to Supabase Storage
+
+**A serverless function has no persistent disk.** Anything written locally
+vanishes when the instance recycles, often within minutes — the photo would
+disappear with no error and the member row would show a broken image.
+
+Photos now upload to the `member-photos` bucket when
+`SUPABASE_SERVICE_ROLE_KEY` is set, and fall back to local disk when it is
+not. Development needs no storage key.
+
+**The service role key bypasses row-level security**, so it is server-only
+and deliberately NOT prefixed `VITE_` — Vite cannot bundle it by accident.
+
+**Deletion routes by the URL's SHAPE, not by current config.** A member
+photographed before the move still has an `/uploads/` URL and must delete
+from disk even though new photos go to the bucket.
+
+**The bucket is public.** Photos appear in an `<img>` on every member row;
+signed URLs would expire mid-session and need refreshing per image, for a
+photo any staff member can already see. Filenames are random UUIDs, so a URL
+cannot be guessed.
+
+## Receipt numbers are no longer printed
+
+The gym did not want them on the member's copy. The number is still
+allocated and still gap-free in the database — payments remain traceable and
+the accountant's CSV export still carries it. Only the PDF, the filename and
+the member-facing UI changed.
+
+The PDF filename is now `receipt-AZF-2026-0042-19-09-2026.pdf`: a member
+downloading two receipts still gets two distinguishable files.

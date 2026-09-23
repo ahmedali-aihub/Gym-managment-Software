@@ -4,6 +4,12 @@ import path from 'node:path';
 import { env } from '../../config/env.js';
 import { ValidationError } from '../../lib/errors.js';
 import { moduleLogger } from '../../lib/logger.js';
+import {
+  isSupabaseStorageEnabled,
+  objectPathFromUrl,
+  removePhoto,
+  uploadPhoto,
+} from './supabase-storage.js';
 
 const log = moduleLogger('storage:photo');
 
@@ -13,10 +19,14 @@ const log = moduleLogger('storage:photo');
  * Photos arrive as base64 data URLs from the webcam capture. They are written
  * to local disk under UPLOAD_DIR and served statically.
  *
- * The local-disk choice is deliberate for a single-branch gym: no object
- * storage account to manage, and backups are a folder copy. The interface is
- * narrow enough that swapping in S3 or Supabase Storage for multi-branch
- * (Phase 4) means reimplementing two functions.
+ * Photos go to SUPABASE STORAGE when it is configured, and to local disk
+ * otherwise. The split is not a preference: a serverless function has no
+ * persistent filesystem, so a locally-written photo vanishes when the
+ * instance recycles — often within minutes, with no error to notice.
+ *
+ * Local disk remains the development path, so running the API needs no
+ * storage key. Validation — size, MIME type, magic bytes — happens before
+ * the split and applies to both.
  */
 
 const ALLOWED_MIME_TYPES = new Set([
@@ -86,6 +96,25 @@ export async function savePhotoFromDataUrl(
   const extension = MIME_EXTENSIONS[mimeType] ?? 'jpg';
   const filename = `${randomUUID()}.${extension}`;
 
+  // Supabase Storage when configured. Serverless has no persistent disk, so
+  // anything written locally vanishes when the instance recycles — the
+  // photo would disappear with no error anywhere.
+  if (isSupabaseStorageEnabled()) {
+    const objectPath = `${subdir}/${filename}`;
+    const url = await uploadPhoto(buffer, objectPath, mimeType);
+
+    log.debug({ objectPath, sizeBytes: buffer.byteLength }, 'Photo uploaded');
+
+    return {
+      url,
+      // Nothing local to delete; deletePhoto reads the URL instead.
+      absolutePath: '',
+      sizeBytes: buffer.byteLength,
+    };
+  }
+
+  // Local disk. Kept for development, where running without a Supabase key
+  // is one less thing to set up.
   const directory = path.resolve(env.UPLOAD_DIR, subdir);
   await mkdir(directory, { recursive: true });
 
@@ -103,7 +132,17 @@ export async function savePhotoFromDataUrl(
 
 /** Remove a stored photo. Never throws — a missing file is not a failure. */
 export async function deletePhoto(photoUrl: string | null): Promise<void> {
-  if (!photoUrl?.startsWith('/uploads/')) return;
+  if (!photoUrl) return;
+
+  // Routed by the URL's shape, not by current configuration: a member
+  // photographed before the move to Supabase still has an /uploads/ URL,
+  // and must delete from disk even though new photos go to the bucket.
+  if (objectPathFromUrl(photoUrl)) {
+    await removePhoto(photoUrl);
+    return;
+  }
+
+  if (!photoUrl.startsWith('/uploads/')) return;
 
   try {
     const relative = photoUrl.replace(/^\/uploads\//, '');
