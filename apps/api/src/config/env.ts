@@ -251,6 +251,25 @@ function parseEnv(): Env {
         `${issues}\n` +
         `╰─ Copy .env.example to .env and fill in the values.\n`,
     );
+    // THROW RATHER THAN EXIT WHEN THERE IS NO PROCESS TO OWN.
+    //
+    // process.exit kills the instance before anything is flushed. In a
+    // serverless function that turns a precise message — "SMTP_PASSWORD is
+    // required" — into FUNCTION_INVOCATION_FAILED and nothing else, which is
+    // unusable: the one line naming the missing variable is destroyed along
+    // with the process that was about to print it.
+    //
+    // Throwing lets the platform catch it, attach it to the request and show
+    // it in the runtime log. A long-running server still stops, because an
+    // unhandled throw at import time terminates it anyway — but only after
+    // the error has actually been written out.
+    if (process.env.VERCEL ?? process.env.AWS_LAMBDA_FUNCTION_NAME) {
+      throw new Error(
+        `Invalid environment configuration:
+${issues}`,
+      );
+    }
+
     process.exit(1);
   }
 
