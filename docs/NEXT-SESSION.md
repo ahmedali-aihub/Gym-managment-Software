@@ -579,3 +579,25 @@ past periods shrink every time you looked at them.
 **Without a range it keeps the live active mix**, which is what "All time"
 should show. The caption switches between "Plans sold · This month" and
 "Active memberships" so the chart always says which it is.
+
+## Deployment — see docs/DEPLOYMENT.md
+
+Vercel (web) + Render (API) + Supabase (database, already live).
+
+**Two things were hardcoded for local development and would have broken a
+deploy.** Both are fixed:
+
+1. `api-client.ts` had `baseURL: '/api'`, which only works because the Vite
+   dev proxy forwards it. On Vercel there is no proxy, so a relative path
+   hits the static host and 404s. `VITE_API_URL` now carries the absolute
+   URL, falling back to '/api' locally.
+
+2. The refresh cookie used `sameSite: 'lax'`, which a browser will NOT send
+   cross-site. With the web app and API on different hosts, every user would
+   have been silently logged out the moment the 15-minute access token
+   expired. Production now uses `'none'`, which requires `secure: true` —
+   hence both hosts must be HTTPS.
+
+**The API needs a long-running process**, not serverless: the background
+workers (expiry sync, notification retries) must stay alive. That is why
+Render rather than Vercel functions.

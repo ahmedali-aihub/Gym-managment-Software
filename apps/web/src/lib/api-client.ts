@@ -28,8 +28,21 @@ export function getAccessToken(): string | null {
   return accessToken;
 }
 
+/**
+ * Where the API lives.
+ *
+ * Locally this stays '/api' and the Vite dev proxy forwards it, which keeps
+ * the browser same-origin so the httpOnly refresh cookie behaves exactly as
+ * it will in production.
+ *
+ * Deployed, the web app and the API are on DIFFERENT hosts and there is no
+ * proxy — a relative '/api' would hit the static host and 404. VITE_API_URL
+ * carries the absolute URL there.
+ */
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+
 export const api: AxiosInstance = axios.create({
-  baseURL: '/api',
+  baseURL: API_BASE_URL,
   withCredentials: true,
   timeout: 30_000,
   headers: { 'Content-Type': 'application/json' },
