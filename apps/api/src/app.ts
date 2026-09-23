@@ -16,6 +16,7 @@ import { dashboardRoutes } from './modules/dashboard/dashboard.routes.js';
 import { expensesRoutes } from './modules/expenses/expenses.routes.js';
 import { invoicesRoutes } from './modules/invoices/invoices.routes.js';
 import { leadsRoutes } from './modules/leads/leads.routes.js';
+import { importRoutes } from './modules/import/import.routes.js';
 import { membersRoutes } from './modules/members/members.routes.js';
 import { paymentsRoutes } from './modules/payments/payments.routes.js';
 import {
@@ -99,6 +100,7 @@ export function createApp(): Application {
   app.use('/api/attendance', attendanceRoutes);
   app.use('/api/dashboard', dashboardRoutes);
   app.use('/api/members', membersRoutes);
+  app.use('/api/import', importRoutes);
   app.use('/api/plans', plansRoutes);
   app.use('/api/memberships', membershipsRoutes);
   app.use('/api/payments', paymentsRoutes);

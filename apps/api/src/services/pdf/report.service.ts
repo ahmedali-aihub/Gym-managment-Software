@@ -149,9 +149,42 @@ export async function generateReportPdf(
 
   const width = doc.page.width - PAGE_MARGIN * 2;
 
+  // ── Watermark ───────────────────────────────────────────────────────
+  //
+  // Loaded once and drawn on EVERY page via `pageAdded`, which also fires
+  // for pages added later — a manual call per page would be silently
+  // forgotten the next time a section is added.
+  //
+  // The handler must run BEFORE the first page's content, so it is
+  // registered here and invoked manually for page one: `pageAdded` does not
+  // fire for the page PDFKit creates with the document.
+  const watermark = await loadLogo();
+
+  function drawWatermark(): void {
+    if (!watermark) return;
+
+    const size = 300;
+    doc.save();
+    // Same 0.07 as the receipt, so the two documents look like one system.
+    doc.opacity(0.07);
+    doc.image(
+      watermark,
+      doc.page.width / 2 - size / 2,
+      doc.page.height / 2 - size / 2,
+      { fit: [size, size], align: 'center', valign: 'center' },
+    );
+    doc.restore();
+    // restore() resets opacity and transform but not the fill colour, which
+    // would otherwise bleed into the next thing drawn.
+    doc.opacity(1).fillColor(COLORS.ink);
+  }
+
+  doc.on('pageAdded', drawWatermark);
+  drawWatermark();
+
   // ── Cover header ────────────────────────────────────────────────────
   let y = PAGE_MARGIN;
-  const logo = await loadLogo();
+  const logo = watermark;
 
   if (logo) {
     try {

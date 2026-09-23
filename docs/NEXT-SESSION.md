@@ -506,3 +506,34 @@ Two details in there worth keeping:
   - The object URL is revoked on a 60s timer, not immediately: revoking
     before the new tab has read it yields a blank viewer, and no event
     reliably fires when it has.
+
+## Member import — BUILT AND WORKING
+
+`/members/import`. Owner and manager only.
+
+Verified end to end against a deliberately messy CSV: quoted commas,
+formatted phones, a landline, a missing name, a missing DOB and a duplicate
+number. All nine columns auto-matched ("Member Name", "Mobile No",
+"Valid Till", "Package"); the landline and the nameless row were rejected;
+the duplicate was flagged rather than merged.
+
+**The CSV is parsed IN THE BROWSER and posted as JSON.** No file upload, so
+the preview returns in one round trip and there is no multer dependency.
+
+**`lib/parse-csv.ts` is a real parser, not `split(',')`.** An address like
+`"12-3, Main Road"` splits into two columns under the naive approach, every
+later field shifts left, and phone numbers land in the email column. On
+6,500 rows nobody notices until a member complains. 10 tests.
+
+**Writes are BATCHED at 50, not one transaction.** 6,500 rows in a single
+transaction holds locks for minutes against a pooled Supabase connection and
+times out; worse, one bad row at 6,400 discards everything before it. A
+failed batch costs at most 50 rows and the report names them.
+
+**NO payment or invoice is created for imported members.** The money was
+taken in the old system; raising a receipt here would invent a transaction
+and corrupt every revenue figure. Membership dates come across, money does
+not.
+
+**Imported members are tagged in `notes`** with what the old system was
+missing, so the front desk sees it when the member is standing there.

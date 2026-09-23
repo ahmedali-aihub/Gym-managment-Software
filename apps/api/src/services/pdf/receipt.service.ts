@@ -115,19 +115,19 @@ async function drawWatermark(doc: PDFKit.PDFDocument): Promise<void> {
   doc.save();
 
   if (logo) {
-    // Smaller and fainter than instinct suggests. At 320px/0.05 the
-    // wordmark inside the logo stayed legible and sat directly behind the
-    // line items — a watermark that can be READ competes with the figures
-    // instead of marking the paper.
-    const size = 240;
-    doc.opacity(0.028);
+    // Brightened on request. 0.028 was so faint it barely registered on a
+    // printed page; 0.07 is clearly visible while still letting the figures
+    // read cleanly over it. Above roughly 0.10 the logo's own wordmark
+    // starts competing with the line items.
+    const size = 280;
+    doc.opacity(0.07);
     doc.image(logo, centreX - size / 2, centreY - size / 2, {
       fit: [size, size],
       align: 'center',
       valign: 'center',
     });
   } else {
-    doc.opacity(0.04);
+    doc.opacity(0.07);
     doc.rotate(-30, { origin: [centreX, centreY] });
     doc
       .font('Helvetica-Bold')

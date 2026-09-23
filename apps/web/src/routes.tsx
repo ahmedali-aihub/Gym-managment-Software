@@ -24,6 +24,11 @@ const MembersPage = React.lazy(() =>
     default: m.MembersPage,
   })),
 );
+const ImportPage = React.lazy(() =>
+  import('@/features/import/import-page').then((m) => ({
+    default: m.ImportPage,
+  })),
+);
 const MemberProfilePage = React.lazy(() =>
   import('@/features/members/member-profile-page').then((m) => ({
     default: m.MemberProfilePage,
@@ -158,6 +163,7 @@ export const router = createBrowserRouter([
       { path: 'dashboard', element: lazyRoute(DashboardPage) },
       { path: 'members', element: lazyRoute(MembersPage) },
       { path: 'members/new', element: lazyRoute(RegisterMemberPage) },
+      { path: 'members/import', element: lazyRoute(ImportPage) },
       { path: 'members/:id', element: lazyRoute(MemberProfilePage) },
       { path: 'payments', element: lazyRoute(PaymentsPage) },
       { path: 'plans', element: lazyRoute(PlansPage) },
