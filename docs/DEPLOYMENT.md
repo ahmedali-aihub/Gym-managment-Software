@@ -58,6 +58,9 @@ NODE_ENV=production
 DATABASE_URL=<Supabase transaction pooler, port 6543>
 DIRECT_URL=<Supabase session pooler, port 5432>
 
+SUPABASE_URL=https://<ref>.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<service role key, NOT the anon key>
+
 JWT_ACCESS_SECRET=<generate a NEW one>
 JWT_REFRESH_SECRET=<generate a NEW one>
 JWT_ACCESS_EXPIRES_IN=15m
@@ -121,9 +124,10 @@ the one before.
 3. [ ] The dashboard shows real member counts, and **no demo-mode banner**
 4. [ ] Open a member — the profile and history load
 5. [ ] Register a test member → a receipt number appears
-6. [ ] The welcome email arrives with the PDF attached
-7. [ ] Download the report PDF
-8. [ ] **Delete the test member**
+6. [ ] **Register one with a photo, wait a minute, reload the profile** — the photo is still there. If it vanished, the Supabase keys are missing and it went to disk.
+7. [ ] The welcome email arrives with the PDF attached
+8. [ ] Download the report PDF
+9. [ ] **Delete the test member**
 
 **A blank page** usually means the build failed — check the Vercel build log.
 
@@ -153,15 +157,36 @@ gym relies on it, either upgrade or point a free scheduler
 
 ---
 
-## Member photos — read this before going live
+## Member photos
 
-Photos are written to the server's local disk. **A serverless function has
-no persistent disk**, so on Vercel they are lost as soon as the function
-instance is recycled — often within minutes.
+Photos go to **Supabase Storage**, not the server's disk. This matters on
+Vercel: a serverless function has no persistent filesystem, so a photo
+written locally disappears when the instance recycles — usually within
+minutes, showing a broken image with no error logged anywhere.
 
-For a demo where nobody uploads a photo, that does not come up. Before real
-members, they move to Supabase Storage. Roughly an hour of work; ask when
-you want it.
+The bucket `member-photos` is created automatically at boot. Two variables
+make it work, both in the list above:
+
+```
+SUPABASE_URL=https://<ref>.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<service role key>
+```
+
+**The service role key bypasses row-level security.** It is read only by the
+server and must never be prefixed `VITE_` — that would bundle it into the
+JavaScript sent to every browser.
+
+With neither set, photos fall back to local disk. That is the development
+path; on Vercel it loses photos silently.
+
+**If you have photos from before this change**, move them across once:
+
+```bash
+npm run photos:migrate -w apps/api             # report what would move
+npm run photos:migrate -w apps/api -- --commit # move them
+```
+
+It only touches photos still on disk, so running it twice is harmless.
 
 ---
 
