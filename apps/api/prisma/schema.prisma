@@ -1,0 +1,911 @@
+// ─────────────────────────────────────────────────────────────────────────────
+//  A to Z Fitness OS — database schema
+//
+//  Conventions:
+//   • All money is stored as Int = PAISE. Never Float, never Decimal-as-rupees.
+//     See packages/shared/src/constants/money.ts for the reasoning.
+//   • Soft deletes via `deletedAt` on records that must survive for audit
+//     (members, payments). Hard delete is reserved for genuine mistakes.
+//   • Every table carries createdAt/updatedAt.
+//   • Indexes are declared for the exact filters the UI offers — not guessed.
+// ─────────────────────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Prisma 7 moved connection URLs out of the schema. They now live in
+// apps/api/prisma.config.ts, which reads DATABASE_URL (the Supabase
+// transaction pooler, for the running app) and DIRECT_URL (the direct
+// connection, which migrations require because the pooler does not support
+// prepared statements).
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum Role {
+  OWNER
+  MANAGER
+  TRAINER
+  RECEPTIONIST
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum MemberStatus {
+  ACTIVE
+  EXPIRED
+  FROZEN
+  CANCELLED
+}
+
+enum PlanType {
+  MONTHLY
+  QUARTERLY
+  HALF_YEARLY
+  YEARLY
+  CUSTOM
+}
+
+enum MembershipStatus {
+  ACTIVE
+  EXPIRED
+  FROZEN
+  CANCELLED
+  UPGRADED
+  TRANSFERRED
+}
+
+enum PaymentMode {
+  CASH
+  UPI
+  CARD
+  NET_BANKING
+  ONLINE
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  PARTIAL
+  FAILED
+  REFUNDED
+}
+
+enum SmsTemplateKey {
+  WELCOME
+  EXPIRY_REMINDER
+  DUES_REMINDER
+  BIRTHDAY
+  WINBACK
+  PAYMENT_RECEIPT
+  CUSTOM
+}
+
+enum SmsStatus {
+  QUEUED
+  SENDING
+  SENT
+  DELIVERED
+  FAILED
+  DEAD
+}
+
+enum SmsProvider {
+  MOCK
+  MSG91
+  TWILIO
+  FAST2SMS
+}
+
+enum EmailStatus {
+  QUEUED
+  SENDING
+  SENT
+  FAILED
+  DEAD
+}
+
+enum EmailProvider {
+  MOCK
+  SMTP
+  BREVO
+  RESEND
+}
+
+enum EmailTemplateKey {
+  WELCOME
+  RECEIPT
+  EXPIRY_REMINDER
+  PAYMENT_DUE
+}
+
+enum WhatsAppStatus {
+  QUEUED
+  SENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+  DEAD
+}
+
+enum WhatsAppProvider {
+  MOCK
+  META
+}
+
+enum WhatsAppTemplateKey {
+  WELCOME
+  PAYMENT_RECEIPT
+  EXPIRY_REMINDER
+  PAYMENT_DUE
+}
+
+enum MembershipEventType {
+  CREATED
+  RENEWED
+  FROZEN
+  UNFROZEN
+  UPGRADED
+  TRANSFERRED_OUT
+  TRANSFERRED_IN
+  CANCELLED
+}
+
+// ─── Staff & auth ────────────────────────────────────────────────────────────
+
+model User {
+  id           String    @id @default(cuid())
+  fullName     String
+  email        String    @unique
+  phone        String    @unique
+  passwordHash String
+  role         Role      @default(RECEPTIONIST)
+  avatarUrl    String?
+  isActive     Boolean   @default(true)
+
+  /// Bumped on password change or forced logout; invalidates live access
+  /// tokens without needing a token blacklist.
+  tokenVersion Int       @default(0)
+  lastLoginAt  DateTime?
+
+  refreshTokens RefreshToken[]
+
+  // Staff actions worth attributing
+  membersCreated  Member[]      @relation("MemberCreatedBy")
+  paymentsTaken   Payment[]     @relation("PaymentCollectedBy")
+  checkInsMarked  Attendance[]  @relation("CheckInMarkedBy")
+  smsSent         SmsLog[]      @relation("SmsSentBy")
+  emailsSent      EmailLog[]    @relation("EmailSentBy")
+  whatsappSent    WhatsAppLog[] @relation("WhatsAppSentBy")
+  membershipEvents MembershipEvent[] @relation("MembershipEventBy")
+  expensesRecorded Expense[]         @relation("ExpenseRecordedBy")
+  leadsAssigned    Lead[]            @relation("LeadAssignedTo")
+  leadActivities   LeadActivity[]    @relation("LeadActivityBy")
+
+  /// Trainer-specific. Null for non-trainer roles.
+  trainerProfile TrainerProfile?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([role, isActive])
+  @@index([deletedAt])
+  @@map("users")
+}
+
+/// Refresh tokens are stored hashed so a database leak cannot be replayed
+/// as a live session. Rotation: each use issues a new token and revokes
+/// the old one, so a stolen token is detectable on reuse.
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  /// Set when this token was rotated, pointing at its successor.
+  replacedBy String?
+
+  userAgent String?
+  ipAddress String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+model TrainerProfile {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  specialization String[] @default([])
+  bio            String?
+  experienceYears Int     @default(0)
+  certifications String[] @default([])
+
+  /// Commission as a percentage of plan value, 0–100. Phase 3 uses this.
+  commissionPercent Int     @default(0)
+  monthlySalaryPaise Int    @default(0)
+
+  assignedMembers Member[] @relation("MemberTrainer")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("trainer_profiles")
+}
+
+// ─── Members ─────────────────────────────────────────────────────────────────
+
+model Member {
+  id       String @id @default(cuid())
+  /// Human-facing ID: AZF-2026-0001. Unique, printed on the card.
+  memberId String @unique
+
+  fullName    String
+  phone       String
+  email       String?
+  dateOfBirth DateTime
+  gender      Gender
+
+  photoUrl String?
+
+  // Address — flattened rather than a join, since it is always read with
+  // the member and never queried independently.
+  addressLine1 String?
+  addressLine2 String?
+  city         String  @default("Hyderabad")
+  state        String  @default("Telangana")
+  pincode      String?
+
+  emergencyContactName     String?
+  emergencyContactPhone    String?
+  emergencyContactRelation String?
+
+  goals        String[] @default([])
+  medicalNotes String?
+  notes        String?
+
+  status   MemberStatus @default(ACTIVE)
+  joinedAt DateTime     @default(now())
+
+  /// Secret half of the check-in QR payload. Rotating it invalidates a
+  /// screenshotted pass without changing the member's printed ID.
+  qrToken String @unique @default(cuid())
+
+  trainerId String?
+  trainer   TrainerProfile? @relation("MemberTrainer", fields: [trainerId], references: [id], onDelete: SetNull)
+
+  createdById String?
+  createdBy   User?   @relation("MemberCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  memberships Membership[]
+  payments    Payment[]
+  invoices    Invoice[]
+  attendance  Attendance[]
+  smsLogs     SmsLog[]
+  emailLogs   EmailLog[]
+  whatsappLogs WhatsAppLog[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  // Phone is the field staff search by most; not unique because families
+  // legitimately share one number.
+  @@index([phone])
+  @@index([status, deletedAt])
+  @@index([fullName])
+  @@index([trainerId])
+  @@index([joinedAt])
+  @@map("members")
+}
+
+// ─── Plans & memberships ─────────────────────────────────────────────────────
+
+model Plan {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  type        PlanType
+  durationDays Int
+  pricePaise   Int
+  joiningFeePaise Int   @default(0)
+  maxFreezeDays   Int   @default(0)
+  features     String[] @default([])
+  isActive     Boolean  @default(true)
+  sortOrder    Int      @default(0)
+
+  memberships Membership[]
+  quotedLeads Lead[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([isActive, sortOrder])
+  @@map("plans")
+}
+
+/// One purchased membership period. A member accumulates these over time;
+/// at most one is ACTIVE or FROZEN at any moment.
+model Membership {
+  id       String @id @default(cuid())
+  memberId String
+  member   Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  planId String
+  plan   Plan   @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  startDate DateTime
+  endDate   DateTime
+  status    MembershipStatus @default(ACTIVE)
+
+  // Price is COPIED from the plan at purchase time. If the gym raises prices
+  // next month, this member's history must still show what they actually paid.
+  pricePaise      Int
+  joiningFeePaise Int @default(0)
+  discountPaise   Int @default(0)
+  discountReason  String?
+  /// pricePaise + joiningFeePaise - discountPaise. Denormalised so dues
+  /// queries do not recompute it per row.
+  totalPaise      Int
+
+  // Freeze tracking
+  freezeStartDate DateTime?
+  freezeEndDate   DateTime?
+  /// Cumulative frozen days already added back to endDate.
+  freezeDaysUsed  Int       @default(0)
+  freezeReason    String?
+
+  /// Set when this membership was replaced by an upgrade or transfer.
+  supersededById String?     @unique
+  supersededBy   Membership? @relation("MembershipSupersession", fields: [supersededById], references: [id], onDelete: SetNull)
+  supersedes     Membership? @relation("MembershipSupersession")
+
+  payments Payment[]
+  invoices Invoice[]
+  events   MembershipEvent[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // The "expiring in 7 days" query hits this composite directly.
+  @@index([status, endDate])
+  @@index([memberId, status])
+  @@index([endDate])
+  @@map("memberships")
+}
+
+/// Append-only audit trail of everything that happened to a membership.
+model MembershipEvent {
+  id           String              @id @default(cuid())
+  membershipId String
+  membership   Membership          @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  type         MembershipEventType
+
+  /// Before/after snapshot, shape depends on `type`.
+  details Json?
+  notes   String?
+
+  performedById String?
+  performedBy   User?   @relation("MembershipEventBy", fields: [performedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([membershipId, createdAt])
+  @@map("membership_events")
+}
+
+// ─── Payments & invoices ─────────────────────────────────────────────────────
+
+model Payment {
+  id       String @id @default(cuid())
+  memberId String
+  member   Member @relation(fields: [memberId], references: [id], onDelete: Restrict)
+
+  membershipId String?
+  membership   Membership? @relation(fields: [membershipId], references: [id], onDelete: SetNull)
+
+  amountPaise   Int
+  discountPaise Int           @default(0)
+  discountReason String?
+  mode          PaymentMode
+  status        PaymentStatus @default(PAID)
+
+  /// UPI txn ID, cheque no., card auth code.
+  reference String?
+  notes     String?
+  paidAt    DateTime @default(now())
+
+  // Razorpay
+  razorpayOrderId   String? @unique
+  razorpayPaymentId String? @unique
+  razorpaySignature String?
+
+  /// Guards double-submission from the front desk.
+  idempotencyKey String? @unique
+
+  // Refunds
+  refundedPaise Int       @default(0)
+  refundedAt    DateTime?
+  refundReason  String?
+
+  collectedById String?
+  collectedBy   User?   @relation("PaymentCollectedBy", fields: [collectedById], references: [id], onDelete: SetNull)
+
+  invoice Invoice?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([memberId, paidAt])
+  @@index([paidAt])
+  @@index([status, mode])
+  @@index([membershipId])
+  @@map("payments")
+}
+
+/// Receipt / invoice document.
+///
+/// A to Z Fitness is not currently GST registered, so these are issued as
+/// plain receipts with the tax fields at zero. The columns exist so that
+/// registering later is a config change, not a migration.
+model Invoice {
+  id            String @id @default(cuid())
+  /// INV/2026-27/0001 — sequential within the Indian financial year.
+  invoiceNumber String @unique
+
+  memberId String
+  member   Member @relation(fields: [memberId], references: [id], onDelete: Restrict)
+
+  membershipId String?
+  membership   Membership? @relation(fields: [membershipId], references: [id], onDelete: SetNull)
+
+  paymentId String?  @unique
+  payment   Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  issuedAt DateTime @default(now())
+
+  // Money breakdown, all paise
+  subtotalPaise Int
+  discountPaise Int @default(0)
+  taxablePaise  Int
+  cgstPaise     Int @default(0)
+  sgstPaise     Int @default(0)
+  igstPaise     Int @default(0)
+  totalPaise    Int
+
+  /// Snapshot of tax settings at issue time — a reprinted 2026 receipt must
+  /// not acquire tax the gym was not charging then.
+  gstRate      Int     @default(0)
+  gstin        String?
+  sacCode      String?
+  isGstInvoice Boolean @default(false)
+
+  /// Snapshot of gym + member identity, so a reprint is faithful even after
+  /// the member changes their name or the gym moves.
+  snapshot Json
+
+  pdfUrl String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([memberId, issuedAt])
+  @@index([issuedAt])
+  @@map("invoices")
+}
+
+/// Per-financial-year sequence for invoice numbers.
+/// A dedicated row lets the number be allocated inside the same transaction
+/// as the invoice, under a row lock — no gaps, no duplicates under concurrency.
+model InvoiceSequence {
+  id            String @id @default(cuid())
+  financialYear String @unique
+  lastSequence  Int    @default(0)
+
+  updatedAt DateTime @updatedAt
+
+  @@map("invoice_sequences")
+}
+
+/// Same idea for member IDs, scoped to the calendar year.
+model MemberSequence {
+  id           String @id @default(cuid())
+  year         Int    @unique
+  lastSequence Int    @default(0)
+
+  updatedAt DateTime @updatedAt
+
+  @@map("member_sequences")
+}
+
+// ─── Attendance ──────────────────────────────────────────────────────────────
+
+model Attendance {
+  id       String @id @default(cuid())
+  memberId String
+  member   Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  checkInAt  DateTime  @default(now())
+  checkOutAt DateTime?
+
+  /// QR | MANUAL | BIOMETRIC
+  method String @default("QR")
+
+  markedById String?
+  markedBy   User?   @relation("CheckInMarkedBy", fields: [markedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  // Powers the live feed, the peak-hours heatmap, and the win-back query.
+  @@index([memberId, checkInAt])
+  @@index([checkInAt])
+  @@map("attendance")
+}
+
+// ─── SMS ─────────────────────────────────────────────────────────────────────
+
+model SmsLog {
+  id String @id @default(cuid())
+
+  memberId String?
+  member   Member? @relation(fields: [memberId], references: [id], onDelete: SetNull)
+
+  toPhone     String
+  templateKey SmsTemplateKey
+  /// Rendered text exactly as submitted to the provider.
+  body        String
+  variables   Json?
+
+  provider SmsProvider
+  status   SmsStatus   @default(QUEUED)
+
+  /// DLT template ID used, for regulator traceability.
+  dltTemplateId     String?
+  providerMessageId String?
+  /// Verbatim provider response, kept for support escalations.
+  rawResponse       Json?
+
+  errorCode    String?
+  errorMessage String?
+
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3)
+  /// When the retry worker should next pick this up.
+  nextRetryAt DateTime?
+
+  segments Int @default(1)
+
+  queuedAt    DateTime  @default(now())
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  failedAt    DateTime?
+
+  sentById String?
+  sentBy   User?   @relation("SmsSentBy", fields: [sentById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // The failed-queue view and the retry worker both hit these.
+  @@index([status, nextRetryAt])
+  @@index([memberId, createdAt])
+  @@index([templateKey, status])
+  @@index([createdAt])
+  @@map("sms_logs")
+}
+
+/// Every email the system sends, with its delivery outcome.
+///
+/// Mirrors SmsLog deliberately: an owner asking "did the member get their
+/// welcome?" should not care which channel carried it, and one shape means
+/// one retry worker and one failed-queue view rather than two of each.
+model EmailLog {
+  id String @id @default(cuid())
+
+  memberId String?
+  member   Member? @relation(fields: [memberId], references: [id], onDelete: SetNull)
+
+  toEmail     String
+  templateKey EmailTemplateKey
+  subject     String
+  /// Rendered HTML exactly as submitted to the provider.
+  body        String
+  variables   Json?
+
+  provider EmailProvider
+  status   EmailStatus   @default(QUEUED)
+
+  providerMessageId String?
+  /// Verbatim provider response, kept for support escalations.
+  rawResponse       Json?
+
+  errorCode    String?
+  errorMessage String?
+
+  /// Filenames only — attachment bytes are regenerated on demand, never
+  /// stored here. A receipt PDF per email would bloat the table for nothing.
+  attachments Json?
+
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3)
+  nextRetryAt DateTime?
+
+  queuedAt DateTime  @default(now())
+  sentAt   DateTime?
+  failedAt DateTime?
+
+  sentById String?
+  sentBy   User?   @relation("EmailSentBy", fields: [sentById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, nextRetryAt])
+  @@index([memberId, createdAt])
+  @@index([templateKey, status])
+  @@index([createdAt])
+  @@map("email_logs")
+}
+
+/// Every WhatsApp message the system sends, with its delivery outcome.
+///
+/// Same shape as SmsLog and EmailLog on purpose: an owner asking "did the
+/// member get their receipt?" should not care which channel carried it, and
+/// one shape means one retry worker rather than three.
+model WhatsAppLog {
+  id String @id @default(cuid())
+
+  memberId String?
+  member   Member? @relation(fields: [memberId], references: [id], onDelete: SetNull)
+
+  /// E.164, e.g. +919876543210 — the only form Meta accepts.
+  toPhone     String
+  templateKey WhatsAppTemplateKey
+  /// Rendered text exactly as submitted, for support escalations.
+  body        String
+  variables   Json?
+
+  /// Meta's approved template name. A message whose body does not match an
+  /// approved template is rejected outright, so this is the contract.
+  metaTemplateName String?
+
+  provider WhatsAppProvider
+  status   WhatsAppStatus   @default(QUEUED)
+
+  providerMessageId String?
+  rawResponse       Json?
+
+  errorCode    String?
+  errorMessage String?
+
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3)
+  nextRetryAt DateTime?
+
+  queuedAt    DateTime  @default(now())
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  readAt      DateTime?
+  failedAt    DateTime?
+
+  sentById String?
+  sentBy   User?   @relation("WhatsAppSentBy", fields: [sentById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, nextRetryAt])
+  @@index([memberId, createdAt])
+  @@index([templateKey, status])
+  @@index([createdAt])
+  @@map("whatsapp_logs")
+}
+
+// ─── Settings & audit ────────────────────────────────────────────────────────
+
+/// Key/value store for runtime-editable configuration (gym identity, tax
+/// toggle, reminder timings). Kept in the DB rather than .env so the owner
+/// can change them from the UI without a redeploy.
+model Setting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value Json
+  label String?
+  group String @default("general")
+
+  updatedAt DateTime @updatedAt
+
+  @@index([group])
+  @@map("settings")
+}
+
+model AuditLog {
+  id String @id @default(cuid())
+
+  actorId   String?
+  actorName String?
+  actorRole Role?
+
+  action     String
+  entityType String
+  entityId   String?
+
+  before Json?
+  after  Json?
+
+  ipAddress String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorId, createdAt])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ─── Expenses & profitability ────────────────────────────────────────────────
+
+enum ExpenseCategory {
+  RENT
+  SALARIES
+  ELECTRICITY
+  WATER
+  EQUIPMENT
+  MAINTENANCE
+  MARKETING
+  SUPPLIES
+  INTERNET
+  INSURANCE
+  TAXES
+  OTHER
+}
+
+/// A cost the gym incurs. Paired with Payment income, these give a real P&L.
+///
+/// `isRecurring` marks a fixed monthly cost (rent, salaries) so next month's
+/// expenses can be pre-filled rather than retyped — the single biggest reason
+/// expense tracking gets abandoned in small businesses.
+model Expense {
+  id       String          @id @default(cuid())
+  category ExpenseCategory
+  /// What it was for, in the owner's own words.
+  title    String
+  notes    String?
+
+  amountPaise Int
+  /// The date the money actually left, not when it was recorded.
+  incurredAt  DateTime
+
+  paymentMode PaymentMode @default(CASH)
+  reference   String?
+  /// Supplier, landlord, contractor.
+  paidTo      String?
+
+  isRecurring Boolean @default(false)
+
+  /// Scanned bill or receipt photo.
+  attachmentUrl String?
+
+  recordedById String?
+  recordedBy   User?   @relation("ExpenseRecordedBy", fields: [recordedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  // The P&L query filters by date range and groups by category.
+  @@index([incurredAt])
+  @@index([category, incurredAt])
+  @@index([deletedAt])
+  @@map("expenses")
+}
+
+// ─── Leads / enquiry pipeline ────────────────────────────────────────────────
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  TRIAL_SCHEDULED
+  TRIAL_DONE
+  NEGOTIATING
+  CONVERTED
+  LOST
+}
+
+enum LeadSource {
+  WALK_IN
+  PHONE
+  REFERRAL
+  INSTAGRAM
+  FACEBOOK
+  GOOGLE
+  WHATSAPP
+  FLYER
+  OTHER
+}
+
+/// Someone who enquired but has not joined yet.
+///
+/// Kept separate from Member deliberately: a lead has no membership, no
+/// payments and no member ID, and forcing them into the member table would
+/// corrupt every count and revenue figure the dashboard reports.
+model Lead {
+  id       String @id @default(cuid())
+  fullName String
+  phone    String
+  email    String?
+
+  source LeadSource @default(WALK_IN)
+  status LeadStatus @default(NEW)
+
+  /// What they said they want — feeds the eventual member's goals.
+  interestedIn String?
+  /// Plan they were quoted, if any.
+  quotedPlanId String?
+  quotedPlan   Plan?   @relation(fields: [quotedPlanId], references: [id], onDelete: SetNull)
+
+  notes String?
+
+  /// When to chase them next. The pipeline's whole value is this field.
+  followUpAt DateTime?
+
+  /// Set when the lead becomes a member, so conversion rate is measurable.
+  convertedMemberId String?  @unique
+  convertedAt       DateTime?
+  lostReason        String?
+
+  assignedToId String?
+  assignedTo   User?   @relation("LeadAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  activities LeadActivity[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([status, followUpAt])
+  @@index([phone])
+  @@index([createdAt])
+  @@index([deletedAt])
+  @@map("leads")
+}
+
+/// Append-only log of every contact attempt with a lead.
+///
+/// "Did anyone call this person back?" is the question a follow-up pipeline
+/// exists to answer, and it cannot be answered from a status field alone.
+model LeadActivity {
+  id     String @id @default(cuid())
+  leadId String
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  /// CALL | VISIT | SMS | WHATSAPP | NOTE | STATUS_CHANGE
+  type    String
+  summary String
+
+  performedById String?
+  performedBy   User?   @relation("LeadActivityBy", fields: [performedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([leadId, createdAt])
+  @@map("lead_activities")
+}

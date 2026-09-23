@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#f7f5f1" />
+    <meta name="description" content="A to Z Fitness — gym management for Mehdipatnam, Hyderabad" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" href="/logo-64.png" sizes="64x64" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <title>A to Z Fitness</title>
+
+    <script>
+      /**
+       * Resolve the theme BEFORE first paint.
+       *
+       * React sets this class too, but it does so after hydration — which
+       * means a dark-mode user would see a flash of cream while the bundle
+       * loads. Doing it inline here is the only way to avoid that.
+       *
+       * Default is LIGHT: Natural Titanium is a warm, light material, and
+       * bronze on near-black reads as muddy brown rather than metal.
+       */
+      (function () {
+        try {
+          var KEY = 'azf-theme';
+          var VERSION_KEY = 'azf-theme-version';
+          var CURRENT_VERSION = '2';
+
+          /**
+           * One-time migration.
+           *
+           * The app previously defaulted to dark, so early users have
+           * "dark" persisted from before the Natural Titanium redesign —
+           * which silently overrides the new default and hides the light
+           * theme entirely. Reset those once, then never touch a stored
+           * preference again.
+           */
+          if (localStorage.getItem(VERSION_KEY) !== CURRENT_VERSION) {
+            localStorage.removeItem(KEY);
+            localStorage.setItem(VERSION_KEY, CURRENT_VERSION);
+          }
+
+          var stored = localStorage.getItem(KEY);
+          var isDark =
+            stored === 'dark' ||
+            (stored === 'system' &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+          if (isDark) {
+            document.documentElement.classList.add('dark');
+            document
+              .querySelector('meta[name="theme-color"]')
+              .setAttribute('content', '#111214');
+          }
+        } catch (e) {
+          // Storage blocked (private mode). Light is the correct fallback.
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

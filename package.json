@@ -1,0 +1,42 @@
+{
+  "name": "a-to-z-fitness-os",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Gym management platform for A to Z Fitness, Mehdipatnam, Hyderabad",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c cyan,magenta \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "npm run dev --workspace=@azf/api",
+    "dev:web": "npm run dev --workspace=@azf/web",
+    "build": "npm run build --workspace=@azf/shared && npm run build --workspace=@azf/api && npm run build --workspace=@azf/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspace=@azf/api",
+    "db:generate": "npm run db:generate --workspace=@azf/api",
+    "db:migrate": "npm run db:migrate --workspace=@azf/api",
+    "db:push": "npm run db:push --workspace=@azf/api",
+    "db:seed": "npm run db:seed --workspace=@azf/api",
+    "db:studio": "npm run db:studio --workspace=@azf/api",
+    "db:reset": "npm run db:reset --workspace=@azf/api",
+    "postinstall": "npm run db:generate --workspace=@azf/api"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.7.3"
+  },
+  "overridesRationale": {
+    "deepmerge-ts": "GHSA-ggr8-5vv4-36mx (stack exhaustion, <8.0.0). Reaches us only via the Prisma CLI's config loader, which parses schema.prisma at build time and never sees request input. Pinned to the patched line so we keep stable Prisma 7 instead of moving to an 8.x release candidate under a payments system.",
+    "@types/react": "The app runs React 18, but transitive dependencies pull @types/react@19 which hoists above our ^18 spec. Two copies in the tree make every lucide-react icon and every Radix component fail to typecheck as a JSX element, because React 19 widened ReactNode to include bigint. Pinned to 18.x so one copy exists."
+  },
+  "overrides": {
+    "deepmerge-ts": "^8.0.0",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
