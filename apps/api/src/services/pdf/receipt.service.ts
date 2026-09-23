@@ -7,7 +7,7 @@ import {
   formatPhone,
 } from '@azf/shared';
 import PDFDocument from 'pdfkit';
-import { env, gymConfig, taxConfig } from '../../config/env.js';
+import { env, gymConfig } from '../../config/env.js';
 import { moduleLogger } from '../../lib/logger.js';
 import { prisma } from '../../lib/prisma.js';
 
@@ -530,11 +530,12 @@ export async function generateReceiptPdf(invoiceId: string): Promise<{
     .fontSize(8)
     .font('Helvetica')
     .text(
+      // No GST note. A plain receipt from an unregistered business does not
+      // need to announce that — it draws attention to the gym's turnover
+      // and means nothing to the member holding it.
       invoice.isGstInvoice
         ? 'This is a computer-generated tax invoice and does not require a signature.'
-        : `This is a computer-generated receipt and does not require a signature.${
-            taxConfig.isRegistered ? '' : ' Not registered for GST.'
-          }`,
+        : 'This is a computer-generated receipt and does not require a signature.',
       PAGE_MARGIN,
       footerY + 12,
       { width, align: 'center' },

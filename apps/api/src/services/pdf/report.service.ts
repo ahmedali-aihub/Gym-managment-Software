@@ -7,7 +7,7 @@ import {
   paiseToRupees,
 } from '@azf/shared';
 import PDFDocument from 'pdfkit';
-import { gymConfig, taxConfig } from '../../config/env.js';
+import { gymConfig } from '../../config/env.js';
 import { moduleLogger } from '../../lib/logger.js';
 
 const log = moduleLogger('pdf:report');
@@ -436,9 +436,7 @@ export async function generateReportPdf(
       .fontSize(7.5)
       .font('Helvetica')
       .text(
-        `${gymConfig.name} · ${periodLabel}${
-          taxConfig.isRegistered ? '' : ' · Not registered for GST'
-        }`,
+        `${gymConfig.name} · ${periodLabel}`,
         PAGE_MARGIN,
         footerY + 7,
         { width: width / 2 },
