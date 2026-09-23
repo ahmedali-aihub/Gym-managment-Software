@@ -5,7 +5,8 @@
   "description": "Gym management platform for A to Z Fitness, Mehdipatnam, Hyderabad",
   "workspaces": [
     "packages/*",
-    "apps/*"
+    "apps/*",
+    "api"
   ],
   "scripts": {
     "dev": "concurrently -n api,web -c cyan,magenta \"npm:dev:api\" \"npm:dev:web\"",

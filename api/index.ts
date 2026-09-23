@@ -19,6 +19,14 @@
  *   • The audit trail. An entry the client could choose not to write is not
  *     an audit trail.
  *
+ * package.json IN THIS FOLDER IS LOAD-BEARING. Vercel builds this file as a
+ * standalone function and resolves its imports from the nearest manifest. The
+ * repository root declares no runtime dependencies — they all live in
+ * apps/api/package.json, which the function builder never reads. Without a
+ * manifest here the bundle ships without express, @prisma/client and the rest,
+ * and every request dies with FUNCTION_INVOCATION_FAILED at runtime, which no
+ * amount of local testing reproduces.
+ *
  * `createApp()` is deliberately separate from `server.ts`: the server adds
  * a listener and the background timers, neither of which a serverless
  * function can have. Those move to Vercel Cron — see vercel.json.

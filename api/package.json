@@ -1,0 +1,11 @@
+{
+  "name": "@azf/vercel-function",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Dependency manifest for the Vercel serverless function. See index.ts.",
+  "dependencies": {
+    "@azf/api": "*",
+    "@azf/shared": "*"
+  }
+}
