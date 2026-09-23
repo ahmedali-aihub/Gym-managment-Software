@@ -1,6 +1,6 @@
 import { formatDate, formatINR } from '@azf/shared';
 import { useMutation } from '@tanstack/react-query';
-import { Mail, MessageCircle, MessageSquare, Send } from 'lucide-react';
+import { Mail, MessageCircle, Send } from 'lucide-react';
 import * as React from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -19,10 +19,12 @@ import { cn } from '@/lib/utils';
 /**
  * Send a reminder to one member, over the channels the owner picks.
  *
- * Replaces the old SMS-only dialog. WhatsApp reaches every member — a phone
- * number is required — while email reaches roughly half and carries the
- * detail. SMS is off by default because Indian transactional SMS needs DLT
- * registration to deliver at all.
+ * WhatsApp and email only. SMS was removed from the UI: Indian
+ * transactional SMS needs DLT registration to deliver at all, so offering
+ * it here would hand the owner a channel that silently goes nowhere.
+ *
+ * WhatsApp reaches every member — a phone number is required — while email
+ * reaches roughly half and carries the detail.
  *
  * The email option is DISABLED, not hidden, when the member has no address.
  * Hiding it would leave the owner wondering why a channel vanished; showing
@@ -30,7 +32,9 @@ import { cn } from '@/lib/utils';
  */
 
 type Kind = 'EXPIRY_REMINDER' | 'PAYMENT_DUE';
-type Channel = 'whatsapp' | 'email' | 'sms';
+// The API still accepts 'sms' — if the gym ever completes DLT
+// registration, only this type and one row need to come back.
+type Channel = 'whatsapp' | 'email';
 
 export interface NotifyMember {
   id: string;
@@ -89,7 +93,6 @@ export function NotifyDialog({
       const sent: string[] = [];
       if (data.summary.whatsappSent) sent.push('WhatsApp');
       if (data.summary.emailSent) sent.push('email');
-      if (data.summary.smsSent) sent.push('SMS');
 
       toast.success(
         sent.length ? `Sent by ${sent.join(' and ')}` : 'Nothing was sent',
@@ -162,13 +165,6 @@ export function NotifyDialog({
                 checked={channels.includes('email')}
                 disabled={!member.email}
                 onToggle={() => toggle('email')}
-              />
-              <ChannelRow
-                icon={MessageSquare}
-                label="SMS"
-                detail="Needs DLT registration to deliver"
-                checked={channels.includes('sms')}
-                onToggle={() => toggle('sms')}
               />
             </div>
           </div>

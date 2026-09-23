@@ -1,19 +1,15 @@
 import {
-  SMS_TEMPLATES,
-  SmsTemplateKey,
-  countSmsSegments,
   daysUntil,
   formatDate,
-  formatINR,
   formatPhone,
-  renderSmsTemplate,
 } from '@azf/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
   CalendarClock,
   CheckCheck,
-  MessageSquare,
+  Mail,
+  MessageCircle,
   Send,
 } from 'lucide-react';
 import * as React from 'react';
@@ -51,6 +47,7 @@ interface ExpiringMembership {
     memberId: string;
     fullName: string;
     phone: string;
+    email: string | null;
     photoUrl: string | null;
   };
   plan: { name: string };
@@ -78,6 +75,9 @@ const WINDOWS = [
  * 200 members is real money, and the count changes with the template, so it
  * belongs next to the Send button.
  */
+type ReminderKind = 'EXPIRY_REMINDER' | 'PAYMENT_DUE';
+type Channel = 'whatsapp' | 'email';
+
 export function RenewalReminderDialog({
   open,
   onOpenChange,
@@ -88,9 +88,13 @@ export function RenewalReminderDialog({
   const queryClient = useQueryClient();
 
   const [windowDays, setWindowDays] = React.useState(7);
-  const [templateKey, setTemplateKey] = React.useState<SmsTemplateKey>(
-    SmsTemplateKey.EXPIRY_REMINDER,
-  );
+  const [kind, setKind] = React.useState<ReminderKind>('EXPIRY_REMINDER');
+  // WhatsApp reaches every member; email only those who gave an address.
+  // Both default on, and the owner unticks what they do not want.
+  const [channels, setChannels] = React.useState<Channel[]>([
+    'whatsapp',
+    'email',
+  ]);
   const [excluded, setExcluded] = React.useState<Set<string>>(new Set());
 
   const { data, isLoading } = useQuery({
@@ -126,43 +130,51 @@ export function RenewalReminderDialog({
    * A preview full of {{placeholders}} tells you nothing about whether the
    * message reads well, and the segment count would be wrong too.
    */
+  // A plain preview. The old version counted GSM-7 segments and estimated
+  // a per-segment cost, which only ever mattered for SMS — WhatsApp and
+  // email are priced per message, not per 160 characters.
   const preview = React.useMemo(() => {
     const first = selected[0];
-    const template = SMS_TEMPLATES[templateKey];
+    const name = first?.member.fullName.split(' ')[0] ?? 'there';
+    const memberCode = first?.member.memberId ?? 'AZF-2026-0000';
+    const expiry = first?.endDate ? formatDate(first.endDate) : '—';
 
-    return renderSmsTemplate(template.body, {
-      name: first ? (first.member.fullName.split(' ')[0] ?? '') : 'Rahul',
-      memberId: first?.member.memberId ?? 'AZF-2026-0001',
-      expiryDate: first ? formatDate(first.endDate) : formatDate(new Date()),
-      amount: '0',
-      days: '21',
-      gymPhone: '+91 90000 00000',
-    });
-  }, [selected, templateKey]);
+    return kind === 'EXPIRY_REMINDER'
+      ? `Hi ${name}, your A to Z Fitness membership (${memberCode}) expires on ${expiry}. Renew to keep training without a break.`
+      : `Hi ${name}, your account ${memberCode} has a pending balance. Please settle it on your next visit.`;
+  }, [selected, kind]);
 
-  const segments = countSmsSegments(preview);
-  const totalSegments = segments.segments * selected.length;
-  // Typical Indian transactional SMS rate.
-  const estimatedCostPaise = totalSegments * 20;
+  const withoutEmail = selected.filter((item) => !item.member.email).length;
 
   const mutation = useMutation({
     mutationFn: async () => {
       const response = await api.post<{
-        data: { queued: number; skipped: number };
-      }>('/sms/send-bulk', {
+        data: { summary: Record<string, number> };
+      }>('/notifications/reminders', {
         memberIds: selected.map((item) => item.member.id),
-        templateKey,
-        variables: {},
+        kind,
+        channels,
       });
       return response.data.data;
     },
 
     onSuccess: (result) => {
       void queryClient.invalidateQueries({ queryKey: ['sms-logs'] });
-      void queryClient.invalidateQueries({ queryKey: ['sms-stats'] });
 
-      toast.success(`${result.queued} reminders queued`, {
-        description: 'Delivery status appears in Messages.',
+      // Reported per channel. "42 reminders sent" is not a useful answer
+      // when eleven of them had no email address to go to.
+      const parts: string[] = [];
+      if (result.summary.whatsappSent) {
+        parts.push(`${result.summary.whatsappSent} on WhatsApp`);
+      }
+      if (result.summary.emailSent) {
+        parts.push(`${result.summary.emailSent} by email`);
+      }
+
+      toast.success(parts.length ? `Sent ${parts.join(', ')}` : 'Nothing sent', {
+        description: result.summary.emailSkipped
+          ? `${result.summary.emailSkipped} had no email address on file.`
+          : undefined,
       });
       onOpenChange(false);
     },
@@ -215,21 +227,17 @@ export function RenewalReminderDialog({
             <div className="space-y-1.5">
               <Label className="text-[13px]">Message</Label>
               <Select
-                value={templateKey}
-                onValueChange={(value) =>
-                  setTemplateKey(value as SmsTemplateKey)
-                }
+                value={kind}
+                onValueChange={(value) => setKind(value as ReminderKind)}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={SmsTemplateKey.EXPIRY_REMINDER}>
+                  <SelectItem value="EXPIRY_REMINDER">
                     Expiry reminder
                   </SelectItem>
-                  <SelectItem value={SmsTemplateKey.DUES_REMINDER}>
-                    Dues reminder
-                  </SelectItem>
+                  <SelectItem value="PAYMENT_DUE">Dues reminder</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -237,30 +245,7 @@ export function RenewalReminderDialog({
 
           {/* Preview */}
           <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <Label className="text-[13px]">Preview</Label>
-              <div className="flex items-center gap-2">
-                <Badge
-                  variant={
-                    segments.encoding === 'GSM-7' ? 'secondary' : 'warning'
-                  }
-                  size="sm"
-                >
-                  {segments.encoding}
-                </Badge>
-                <span
-                  className={cn(
-                    'text-[11px]',
-                    segments.segments > 1
-                      ? 'font-medium text-warning'
-                      : 'text-muted-foreground',
-                  )}
-                >
-                  {segments.segments} segment
-                  {segments.segments === 1 ? '' : 's'} each
-                </span>
-              </div>
-            </div>
+            <Label className="text-[13px]">Preview</Label>
 
             <div className="rounded-xl border border-border bg-muted/40 px-4 py-3">
               <p className="whitespace-pre-wrap text-[13px] leading-relaxed">
@@ -373,30 +358,52 @@ export function RenewalReminderDialog({
             </div>
           </div>
 
-          {/* Cost */}
-          {selected.length > 0 && (
-            <div className="flex items-center gap-2.5 rounded-xl bg-muted/50 px-4 py-2.5">
-              <MessageSquare className="size-3.5 shrink-0 text-muted-foreground" />
-              <p className="flex-1 text-[12px] text-muted-foreground">
-                {selected.length} message{selected.length === 1 ? '' : 's'} ·{' '}
-                {totalSegments} segment{totalSegments === 1 ? '' : 's'}
-              </p>
-              <span className="tabular text-[13px] font-medium">
-                ≈ {formatINR(estimatedCostPaise, { showDecimals: false })}
-              </span>
+          {/* Channels. Replaces the old per-segment cost estimate, which
+              only ever applied to SMS — WhatsApp and email are priced per
+              message, and both are free at this gym's volume. */}
+          <div className="space-y-1.5">
+            <Label className="text-[13px]">Send by</Label>
+            <div className="flex flex-wrap gap-2">
+              <ChannelToggle
+                icon={MessageCircle}
+                label="WhatsApp"
+                detail={`reaches all ${selected.length}`}
+                active={channels.includes('whatsapp')}
+                onToggle={() =>
+                  setChannels((c) =>
+                    c.includes('whatsapp')
+                      ? c.filter((x) => x !== 'whatsapp')
+                      : [...c, 'whatsapp'],
+                  )
+                }
+              />
+              <ChannelToggle
+                icon={Mail}
+                label="Email"
+                detail={
+                  withoutEmail > 0
+                    ? `${selected.length - withoutEmail} of ${selected.length} have one`
+                    : `reaches all ${selected.length}`
+                }
+                active={channels.includes('email')}
+                onToggle={() =>
+                  setChannels((c) =>
+                    c.includes('email')
+                      ? c.filter((x) => x !== 'email')
+                      : [...c, 'email'],
+                  )
+                }
+              />
             </div>
-          )}
 
-          {segments.segments > 1 && selected.length > 0 && (
-            <div className="flex items-start gap-2.5 rounded-xl bg-warning/[0.08] px-4 py-2.5">
-              <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-warning" />
-              <p className="text-[12px] leading-relaxed text-warning">
-                This message spans {segments.segments} segments, so it costs{' '}
-                {segments.segments}× per member. Shortening it below 160
-                characters would halve the bill.
+            {channels.includes('email') && withoutEmail > 0 && (
+              <p className="flex items-start gap-2 rounded-xl bg-muted/50 px-3 py-2 text-[12px] text-muted-foreground">
+                <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+                {withoutEmail} of these members have no email address, so they
+                will only receive the WhatsApp message.
               </p>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         <DialogFooter className="mt-5">
@@ -424,3 +431,42 @@ export function RenewalReminderDialog({
 }
 
 export { CalendarClock };
+
+/**
+ * A channel on/off pill.
+ *
+ * Both channels stay ENABLED even when some members lack an email: the
+ * owner may still want to reach the ones who have an address, and the
+ * count beside the label says how many that is.
+ */
+function ChannelToggle({
+  icon: Icon,
+  label,
+  detail,
+  active,
+  onToggle,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  detail: string;
+  active: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={active}
+      className={cn(
+        'flex items-center gap-2 rounded-full border px-3 py-1.5 text-[13px] transition-colors',
+        active
+          ? 'border-primary bg-primary/10 text-foreground'
+          : 'border-border text-muted-foreground hover:text-foreground',
+      )}
+    >
+      <Icon className="size-3.5 shrink-0" />
+      <span className="font-medium">{label}</span>
+      <span className="text-[11px] text-muted-foreground">{detail}</span>
+    </button>
+  );
+}

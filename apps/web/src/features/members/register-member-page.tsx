@@ -31,7 +31,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Checkbox, Separator, Textarea } from '@/components/ui/misc';
+import { Separator, Textarea } from '@/components/ui/misc';
 import {
   Select,
   SelectContent,
@@ -462,9 +462,10 @@ export function RegisterMemberPage() {
               </div>
             )}
 
-            {/* Email and WhatsApp always go out — they cost nothing and
-                need no registration. Only SMS is a choice, because Indian
-                transactional SMS needs DLT approval to deliver at all. */}
+            {/* Email and WhatsApp only. SMS is not offered: Indian
+                transactional SMS needs DLT registration to deliver at all,
+                so a toggle here would promise something that goes nowhere.
+                The API still accepts sendWelcomeSms if that ever changes. */}
             <div className="rounded-xl bg-muted/40 px-3.5 py-3">
               <p className="text-[13px] font-medium">
                 This member will automatically receive
@@ -483,20 +484,6 @@ export function RegisterMemberPage() {
                 </li>
               </ul>
 
-              <label className="mt-3 flex cursor-pointer items-center gap-2.5 border-t border-border pt-2.5 text-[13px]">
-                <Checkbox
-                  checked={watch('sendWelcomeSms')}
-                  onCheckedChange={(checked) =>
-                    setValue('sendWelcomeSms', checked === true)
-                  }
-                />
-                <span className="text-muted-foreground">
-                  Also send an SMS
-                  <span className="ml-1 text-muted-foreground/70">
-                    — needs DLT registration to deliver
-                  </span>
-                </span>
-              </label>
             </div>
           </CardContent>
         </Card>

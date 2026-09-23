@@ -626,6 +626,9 @@ class MembershipsService {
             memberId: true,
             fullName: true,
             phone: true,
+            // Needed by the reminder dialog to show how many of the selected
+            // members can actually receive an email.
+            email: true,
             photoUrl: true,
           },
         },
