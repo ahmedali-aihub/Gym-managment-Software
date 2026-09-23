@@ -489,3 +489,20 @@ receipts.
 plain `<a href>` to `/api/invoices/:id/pdf`, which the browser fetches
 itself and the demo axios adapter never sees. It now shows the same guard as
 the Reports download.
+
+## PDF downloads need `openPdf`, never `window.open`
+
+Both PDF routes answered **401** in the browser. The access token is held in
+a module variable — deliberately, so an XSS cannot read it — and a new tab
+is a fresh document that carries no Authorization header. The tab showed
+raw JSON instead of a receipt.
+
+`lib/open-pdf.ts` fetches the bytes through axios (token attached), then
+opens an object URL. Use it for every future PDF route.
+
+Two details in there worth keeping:
+  - An API error still arrives as a Blob when `responseType: 'blob'`, so the
+    helper checks the MIME type and surfaces the real message.
+  - The object URL is revoked on a 60s timer, not immediately: revoking
+    before the new tab has read it yields a blank viewer, and no event
+    reliably fires when it has.
