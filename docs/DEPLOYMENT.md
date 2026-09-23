@@ -139,10 +139,36 @@ redeploy; a restart alone does nothing.
 
 ## Scheduled work
 
-Two jobs run on Vercel Cron, configured in `vercel.json`:
+Two jobs keep the data honest. Both are plain URLs that refuse any request
+without `CRON_SECRET` as a bearer token — they are publicly reachable, and an
+open retry endpoint is something to hammer.
 
 | Job | When | Why |
 |---|---|---|
+| `/api/cron/sync-expiry` | Daily, 01:00 | Marks lapsed memberships expired. Without it, "active members" keeps counting everyone who lapsed overnight, and every KPI built on that number is wrong. |
+| `/api/cron/retry-notifications` | Every 30 min | Retries failed emails and WhatsApp messages. Without it, one Gmail hiccup means the member simply never hears from the gym. |
+
+**Only the daily one is in `vercel.json`.** Hobby accounts allow cron jobs
+that run at most once a day; a `*/30` expression is rejected outright and the
+deploy will not start. The retry job is therefore scheduled externally.
+
+### Scheduling the retry job
+
+Free, on **cron-job.org** (any scheduler works):
+
+1. Create a job for `https://<your-app>.vercel.app/api/cron/retry-notifications`
+2. Schedule: every 30 minutes
+3. Add a request header:
+   `Authorization: Bearer <your CRON_SECRET>`
+
+Without that header the endpoint answers `401` and does nothing — which is
+also how you test it. Call the URL in a browser: a `401` means the job is
+reachable and properly guarded.
+
+On Vercel Pro, move it back into `vercel.json` alongside the daily job and
+delete the external one.
+
+---|---|---|
 | `/api/cron/sync-expiry` | Daily, 01:00 | Marks lapsed memberships expired. Without it, "active members" keeps counting everyone who lapsed overnight. |
 | `/api/cron/retry-notifications` | Every 30 min | Retries failed emails and WhatsApp messages. |
 
