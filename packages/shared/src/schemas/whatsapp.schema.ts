@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { WhatsAppTemplateKey } from '../types/enums.js';
+import { WhatsAppProvider, WhatsAppStatus, WhatsAppTemplateKey } from '../types/enums.js';
+import { paginationSchema } from './common.schema.js';
 
 /**
  * WhatsApp templates.
@@ -131,3 +132,26 @@ export const sendWhatsAppSchema = z.object({
 });
 
 export type SendWhatsAppInput = z.infer<typeof sendWhatsAppSchema>;
+
+export const whatsappLogQuerySchema = paginationSchema.extend({
+  search: z.string().trim().max(100).optional(),
+  status: z.nativeEnum(WhatsAppStatus).optional(),
+  templateKey: z.nativeEnum(WhatsAppTemplateKey).optional(),
+  provider: z.nativeEnum(WhatsAppProvider).optional(),
+  memberId: z.string().optional(),
+  from: z.coerce.date().optional(),
+  to: z.coerce.date().optional(),
+});
+
+export type WhatsAppLogQuery = z.infer<typeof whatsappLogQuerySchema>;
+
+export interface WhatsAppStats {
+  total: number;
+  queued: number;
+  sent: number;
+  delivered: number;
+  read: number;
+  failed: number;
+  dead: number;
+  deliveryRate: number;
+}

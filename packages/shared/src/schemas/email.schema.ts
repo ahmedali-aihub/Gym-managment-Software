@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { EmailTemplateKey } from '../types/enums.js';
+import { EmailProvider, EmailStatus, EmailTemplateKey } from '../types/enums.js';
+import { paginationSchema } from './common.schema.js';
 
 /**
  * Email templates.
@@ -304,3 +305,24 @@ export const sendEmailSchema = z.object({
 });
 
 export type SendEmailInput = z.infer<typeof sendEmailSchema>;
+
+export const emailLogQuerySchema = paginationSchema.extend({
+  search: z.string().trim().max(100).optional(),
+  status: z.nativeEnum(EmailStatus).optional(),
+  templateKey: z.nativeEnum(EmailTemplateKey).optional(),
+  provider: z.nativeEnum(EmailProvider).optional(),
+  memberId: z.string().optional(),
+  from: z.coerce.date().optional(),
+  to: z.coerce.date().optional(),
+});
+
+export type EmailLogQuery = z.infer<typeof emailLogQuerySchema>;
+
+export interface EmailStats {
+  total: number;
+  queued: number;
+  sent: number;
+  failed: number;
+  dead: number;
+  deliveryRate: number;
+}

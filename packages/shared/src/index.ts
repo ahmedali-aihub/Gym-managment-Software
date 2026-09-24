@@ -23,3 +23,4 @@ export * from './schemas/payment.schema.js';
 export * from './schemas/email.schema.js';
 export * from './schemas/sms.schema.js';
 export * from './schemas/whatsapp.schema.js';
+export * from './schemas/messages.schema.js';

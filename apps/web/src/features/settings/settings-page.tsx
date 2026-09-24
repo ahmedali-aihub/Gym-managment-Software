@@ -3,6 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import {
   Building2,
   CheckCircle2,
+  Mail,
+  MessageCircle,
   MessageSquare,
   Receipt,
   ShieldCheck,
@@ -29,6 +31,11 @@ interface ProviderStatus {
   message: string;
 }
 
+interface MessageProviderStatus {
+  email: ProviderStatus;
+  whatsapp: ProviderStatus;
+}
+
 /**
  * Settings.
  *
@@ -48,6 +55,18 @@ export function SettingsPage() {
     },
     retry: false,
   });
+
+  const { data: messageProviders, isLoading: isLoadingMessageProviders } =
+    useQuery({
+      queryKey: ['message-provider'],
+      queryFn: async () => {
+        const response = await api.get<{ data: MessageProviderStatus }>(
+          '/messages/provider',
+        );
+        return response.data.data;
+      },
+      retry: false,
+    });
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -117,6 +136,28 @@ export function SettingsPage() {
         </CardContent>
       </Card>
 
+      {/* Email */}
+      <ProviderCard
+        icon={Mail}
+        title="Email"
+        description="Delivery provider — welcome messages, receipts, reminders"
+        status={messageProviders?.email}
+        isLoading={isLoadingMessageProviders}
+        fallbackMessage="Messages are logged and visible in the UI, but nothing is delivered to a real inbox."
+        footnote="Every send is logged in Messages regardless of outcome — a bounced or rejected email fails loudly there rather than recording a silent success."
+      />
+
+      {/* WhatsApp */}
+      <ProviderCard
+        icon={MessageCircle}
+        title="WhatsApp"
+        description="Delivery provider and Meta template configuration"
+        status={messageProviders?.whatsapp}
+        isLoading={isLoadingMessageProviders}
+        fallbackMessage="Messages are logged and visible in the UI, but nothing is delivered to a real phone."
+        footnote="Meta requires every business-initiated message to match a template it has approved in advance. A message that does not match is rejected outright — the same fail-loudly principle as SMS below."
+      />
+
       {/* SMS */}
       <Card>
         <CardHeader className="pb-3">
@@ -125,7 +166,7 @@ export function SettingsPage() {
             <CardTitle className="text-base">SMS</CardTitle>
           </div>
           <CardDescription>
-            Delivery provider and DLT configuration
+            Configured but not sent from this app — see below
           </CardDescription>
         </CardHeader>
 
@@ -175,10 +216,13 @@ export function SettingsPage() {
 
               <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">
                 Transactional SMS in India must match a DLT-approved template
-                registered with the telecom regulator. Text that deviates is
-                dropped by the operator with no error returned, so the system
-                fails loudly at send time when a template ID is missing rather
-                than recording a success for a message nobody received.
+                registered with the telecom regulator — a real send would
+                fail loudly at that step rather than silently drop, the same
+                as WhatsApp's Meta template requirement above. Nothing in the
+                app currently sends SMS: WhatsApp reaches every member and
+                email carries the detail, so DLT registration was never
+                pursued. This stays configured, not removed, in case that
+                changes.
               </p>
             </>
           )}
@@ -257,5 +301,90 @@ function Row({
       <dt className="shrink-0 text-muted-foreground">{label}</dt>
       <dd className="text-right font-medium">{value}</dd>
     </div>
+  );
+}
+
+/**
+ * The same provider/status/message shape the SMS card above uses,
+ * parameterised so email and WhatsApp don't repeat it by hand.
+ */
+function ProviderCard({
+  icon: Icon,
+  title,
+  description,
+  status,
+  isLoading,
+  fallbackMessage,
+  footnote,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  description: string;
+  status?: ProviderStatus;
+  isLoading: boolean;
+  fallbackMessage: string;
+  footnote: string;
+}) {
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center gap-2">
+          <Icon className="size-4 text-muted-foreground" />
+          <CardTitle className="text-base">{title}</CardTitle>
+        </div>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+
+      <CardContent>
+        {isLoading ? (
+          <div className="space-y-3">
+            <Skeleton className="h-5 w-full" />
+            <Skeleton className="h-5 w-3/4" />
+          </div>
+        ) : (
+          <>
+            <dl className="space-y-3 text-sm">
+              <Row
+                label="Provider"
+                value={
+                  <Badge variant={status?.ok ? 'success' : 'warning'}>
+                    {status?.provider?.toUpperCase() ??
+                      (isDemoMode ? 'MOCK' : 'Unknown')}
+                  </Badge>
+                }
+              />
+              <Row
+                label="Status"
+                value={
+                  <span
+                    className={cn(
+                      'flex items-center gap-1.5',
+                      status?.ok ? 'text-success' : 'text-warning',
+                    )}
+                  >
+                    {status?.ok ? (
+                      <CheckCircle2 className="size-3.5" />
+                    ) : (
+                      <XCircle className="size-3.5" />
+                    )}
+                    {status?.ok ? 'Configured' : 'Needs attention'}
+                  </span>
+                }
+              />
+            </dl>
+
+            <Separator className="my-4" />
+
+            <p className="text-[13px] leading-relaxed text-muted-foreground">
+              {status?.message ?? fallbackMessage}
+            </p>
+
+            <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">
+              {footnote}
+            </p>
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }

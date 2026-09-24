@@ -19,6 +19,7 @@ import { invoicesRoutes } from './modules/invoices/invoices.routes.js';
 import { leadsRoutes } from './modules/leads/leads.routes.js';
 import { importRoutes } from './modules/import/import.routes.js';
 import { membersRoutes } from './modules/members/members.routes.js';
+import { messagesRoutes } from './modules/messages/messages.routes.js';
 import { notificationsRoutes } from './modules/notifications/notifications.routes.js';
 import { paymentsRoutes } from './modules/payments/payments.routes.js';
 import {
@@ -102,6 +103,7 @@ export function createApp(): Application {
   app.use('/api/attendance', attendanceRoutes);
   app.use('/api/dashboard', dashboardRoutes);
   app.use('/api/members', membersRoutes);
+  app.use('/api/messages', messagesRoutes);
   app.use('/api/import', importRoutes);
   app.use('/api/notifications', notificationsRoutes);
   // Scheduled work. Authenticated by CRON_SECRET, not a session — see the

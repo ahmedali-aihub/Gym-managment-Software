@@ -216,6 +216,30 @@ class EmailService {
     }
   }
 
+  /** Manually retry a failed email from the Messages UI. */
+  async retryMessage(emailLogId: string): Promise<EmailLog> {
+    const emailLog = await prisma.emailLog.findUniqueOrThrow({
+      where: { id: emailLogId },
+    });
+
+    // Give it a fresh budget; the operator has presumably fixed the cause
+    // (a corrected address, a rotated SMTP password, and so on).
+    const reset = await prisma.emailLog.update({
+      where: { id: emailLogId },
+      data: {
+        status: EmailStatus.QUEUED,
+        attempts: 0,
+        maxAttempts: Math.max(emailLog.maxAttempts, env.EMAIL_MAX_RETRIES),
+        errorCode: null,
+        errorMessage: null,
+        nextRetryAt: null,
+        failedAt: null,
+      },
+    });
+
+    return this.attemptDelivery(reset);
+  }
+
   /** Rows due for another attempt, oldest first. */
   async getRetryable(limit = 25): Promise<EmailLog[]> {
     return prisma.emailLog.findMany({

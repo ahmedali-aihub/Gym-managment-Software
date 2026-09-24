@@ -210,6 +210,14 @@ export const EmailProvider = {
 } as const;
 export type EmailProvider = (typeof EmailProvider)[keyof typeof EmailProvider];
 
+export const EMAIL_STATUS_LABELS: Record<EmailStatus, string> = {
+  QUEUED: 'Queued',
+  SENDING: 'Sending',
+  SENT: 'Sent',
+  FAILED: 'Failed',
+  DEAD: 'Failed (retries exhausted)',
+};
+
 // ─── WhatsApp ───────────────────────────────────────────────────────────────
 //
 // A separate channel again: WhatsApp needs Meta template approval rather than
@@ -250,6 +258,16 @@ export const WhatsAppProvider = {
 } as const;
 export type WhatsAppProvider =
   (typeof WhatsAppProvider)[keyof typeof WhatsAppProvider];
+
+export const WHATSAPP_STATUS_LABELS: Record<WhatsAppStatus, string> = {
+  QUEUED: 'Queued',
+  SENDING: 'Sending',
+  SENT: 'Sent',
+  DELIVERED: 'Delivered',
+  READ: 'Read',
+  FAILED: 'Failed',
+  DEAD: 'Failed (retries exhausted)',
+};
 
 export const SmsStatus = {
   QUEUED: 'QUEUED',

@@ -48,7 +48,7 @@ const PlansPage = React.lazy(() =>
   import('@/features/plans/plans-page').then((m) => ({ default: m.PlansPage })),
 );
 const MessagesPage = React.lazy(() =>
-  import('@/features/sms/messages-page').then((m) => ({
+  import('@/features/messages/messages-page').then((m) => ({
     default: m.MessagesPage,
   })),
 );

@@ -1,9 +1,9 @@
 import {
-  SMS_STATUS_LABELS,
-  SMS_TEMPLATE_LABELS,
+  MESSAGE_STATUS_LABELS,
   formatDateTime,
-  type SmsStatus,
-  type SmsTemplateKey,
+  type MessageLogRow,
+  type MessageStats,
+  type MessageStatus,
 } from '@azf/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
@@ -11,12 +11,16 @@ import {
   AlertTriangle,
   CheckCheck,
   Clock,
+  Mail,
+  MessageCircle,
   MessageSquare,
   RefreshCw,
   Send,
   XCircle,
 } from 'lucide-react';
+import * as React from 'react';
 import { toast } from 'sonner';
+import { SegmentedControl } from '@/components/common/segmented-control';
 import { EmptyState, ErrorState } from '@/components/common/states';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -26,36 +30,16 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { api, getErrorMessage } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
 
-interface SmsLog {
-  id: string;
-  toPhone: string;
-  templateKey: SmsTemplateKey;
-  body: string;
-  status: SmsStatus;
-  provider: string;
-  errorCode: string | null;
-  errorMessage: string | null;
-  attempts: number;
-  maxAttempts: number;
-  segments: number;
-  createdAt: string;
-  sentAt: string | null;
-  member: { id: string; memberId: string; fullName: string } | null;
-}
+type ChannelFilter = 'all' | 'email' | 'whatsapp';
 
-interface SmsStats {
-  total: number;
-  queued: number;
-  sent: number;
-  delivered: number;
-  failed: number;
-  dead: number;
-  deliveryRate: number;
-  segmentsUsed: number;
-}
+const CHANNEL_OPTIONS: Array<{ value: ChannelFilter; label: string; shortLabel: string }> = [
+  { value: 'all', label: 'All channels', shortLabel: 'All' },
+  { value: 'email', label: 'Email', shortLabel: 'Email' },
+  { value: 'whatsapp', label: 'WhatsApp', shortLabel: 'WhatsApp' },
+];
 
 const STATUS_VARIANTS: Record<
-  SmsStatus,
+  MessageStatus,
   'success' | 'destructive' | 'warning' | 'info' | 'secondary'
 > = {
   QUEUED: 'secondary',
@@ -66,10 +50,7 @@ const STATUS_VARIANTS: Record<
   DEAD: 'destructive',
 };
 
-const STATUS_ICONS: Record<
-  SmsStatus,
-  React.ComponentType<{ className?: string }>
-> = {
+const STATUS_ICONS: Record<MessageStatus, React.ComponentType<{ className?: string }>> = {
   QUEUED: Clock,
   SENDING: Send,
   SENT: Send,
@@ -78,57 +59,91 @@ const STATUS_ICONS: Record<
   DEAD: XCircle,
 };
 
+const CHANNEL_ICONS = {
+  EMAIL: Mail,
+  WHATSAPP: MessageCircle,
+} as const;
+
+interface ProviderStatus {
+  email: { provider: string; ok: boolean; message: string };
+  whatsapp: { provider: string; ok: boolean; message: string };
+}
+
 /**
  * Messages.
  *
- * Two views: the full log, and the failed queue that needs attention.
+ * One history over both channels the app actually sends on — email and
+ * WhatsApp — not two. Before this, the page showed an SMS log for a channel
+ * the UI stopped offering months ago (see notify-dialog.tsx's own note on
+ * why SMS stays wired on the backend but not here); nobody could see what
+ * had actually gone out to members.
  *
- * The failed queue is deliberately its own tab rather than a filter on the
- * log. A message that failed permanently is a member who did not get told
- * their membership is expiring — it is a task, not a record, and it should
- * not have to be hunted for behind a dropdown.
+ * Three views: the merged log, the failed queue that needs attention, and a
+ * channel filter across both — a segmented control with the same drag
+ * gesture as the nav bar and every other filter in the app, not a dropdown.
+ *
+ * The failed queue is its own tab rather than a filter on the log for the
+ * same reason it always was: a message that failed permanently is a member
+ * who did not get told their membership is expiring. That is a task, not a
+ * record, and should not have to be hunted for behind a dropdown.
  */
 export function MessagesPage() {
   const queryClient = useQueryClient();
+  const [channel, setChannel] = React.useState<ChannelFilter>('all');
 
   const { data: stats } = useQuery({
-    queryKey: ['sms-stats'],
+    queryKey: ['message-stats'],
     queryFn: async () => {
-      const response = await api.get<{ data: SmsStats }>('/sms/stats');
+      const response = await api.get<{ data: MessageStats }>('/messages/stats');
       return response.data.data;
     },
   });
 
-  const logs = useQuery({
-    queryKey: ['sms-logs'],
+  const { data: providerStatus } = useQuery({
+    queryKey: ['message-provider'],
     queryFn: async () => {
-      const response = await api.get<{ data: SmsLog[] }>('/sms/logs', {
-        params: { limit: 30 },
+      const response = await api.get<{ data: ProviderStatus }>('/messages/provider');
+      return response.data.data;
+    },
+    // Provider health rarely changes; no need to poll it as often as the log.
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const logs = useQuery({
+    queryKey: ['message-logs', channel],
+    queryFn: async () => {
+      const response = await api.get<{ data: MessageLogRow[] }>('/messages', {
+        params: { limit: 30, channel },
       });
       return response.data.data;
     },
   });
 
   const failed = useQuery({
-    queryKey: ['sms-failed'],
+    queryKey: ['message-failed'],
     queryFn: async () => {
-      const response = await api.get<{ data: SmsLog[] }>('/sms/failed', {
+      const response = await api.get<{ data: MessageLogRow[] }>('/messages/failed', {
         params: { limit: 30 },
       });
       return response.data.data;
     },
   });
 
+  const invalidateAll = () => {
+    void queryClient.invalidateQueries({ queryKey: ['message-logs'] });
+    void queryClient.invalidateQueries({ queryKey: ['message-failed'] });
+    void queryClient.invalidateQueries({ queryKey: ['message-stats'] });
+  };
+
   const retryOne = useMutation({
-    mutationFn: async (id: string) => {
-      const response = await api.post<{ data: SmsLog }>(`/sms/${id}/retry`);
+    mutationFn: async (row: MessageLogRow) => {
+      const response = await api.post<{ data: MessageLogRow }>(
+        `/messages/${row.channel}/${row.id}/retry`,
+      );
       return response.data.data;
     },
     onSuccess: (data) => {
-      void queryClient.invalidateQueries({ queryKey: ['sms-failed'] });
-      void queryClient.invalidateQueries({ queryKey: ['sms-logs'] });
-      void queryClient.invalidateQueries({ queryKey: ['sms-stats'] });
-
+      invalidateAll();
       if (data.status === 'SENT' || data.status === 'DELIVERED') {
         toast.success('Message sent');
       } else {
@@ -144,14 +159,11 @@ export function MessagesPage() {
     mutationFn: async () => {
       const response = await api.post<{
         data: { attempted: number; succeeded: number; failed: number };
-      }>('/sms/retry-all');
+      }>('/messages/retry-all');
       return response.data.data;
     },
     onSuccess: (result) => {
-      void queryClient.invalidateQueries({ queryKey: ['sms-failed'] });
-      void queryClient.invalidateQueries({ queryKey: ['sms-logs'] });
-      void queryClient.invalidateQueries({ queryKey: ['sms-stats'] });
-
+      invalidateAll();
       toast.success(`${result.succeeded} of ${result.attempted} sent`, {
         description:
           result.failed > 0
@@ -166,13 +178,30 @@ export function MessagesPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-display text-2xl font-semibold tracking-tight sm:text-[28px]">
-          Messages
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          SMS delivery log and failed-message queue
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="font-display text-2xl font-semibold tracking-tight sm:text-[28px]">
+            Messages
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Email and WhatsApp history — everything sent to members, in one place
+          </p>
+        </div>
+
+        {providerStatus && (
+          <div className="flex flex-wrap gap-2">
+            <ProviderBadge
+              icon={Mail}
+              label="Email"
+              status={providerStatus.email}
+            />
+            <ProviderBadge
+              icon={MessageCircle}
+              label="WhatsApp"
+              status={providerStatus.whatsapp}
+            />
+          </div>
+        )}
       </div>
 
       {/* Stats */}
@@ -219,7 +248,13 @@ export function MessagesPage() {
           )}
         </div>
 
-        <TabsContent value="all">
+        <TabsContent value="all" className="space-y-4">
+          <SegmentedControl
+            options={CHANNEL_OPTIONS}
+            value={channel}
+            onChange={setChannel}
+            ariaLabel="Channel"
+          />
           <MessageList
             query={logs}
             emptyTitle="No messages yet"
@@ -232,11 +267,38 @@ export function MessagesPage() {
             query={failed}
             emptyTitle="Nothing failed"
             emptyDescription="Every message has been delivered or is still in the queue."
-            onRetry={(id) => retryOne.mutate(id)}
-            retryingId={retryOne.isPending ? retryOne.variables : undefined}
+            onRetry={(row) => retryOne.mutate(row)}
+            retryingId={retryOne.isPending ? retryOne.variables?.id : undefined}
           />
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function ProviderBadge({
+  icon: Icon,
+  label,
+  status,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  status: { provider: string; ok: boolean; message: string };
+}) {
+  return (
+    <div
+      title={status.message}
+      className={cn(
+        'flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium',
+        status.ok
+          ? 'border-success/25 bg-success/10 text-success'
+          : 'border-destructive/25 bg-destructive/10 text-destructive',
+      )}
+    >
+      <Icon className="size-3" />
+      {label}
+      <span className="text-muted-foreground">·</span>
+      <span className="capitalize text-muted-foreground">{status.provider}</span>
     </div>
   );
 }
@@ -248,10 +310,10 @@ function MessageList({
   onRetry,
   retryingId,
 }: {
-  query: ReturnType<typeof useQuery<SmsLog[]>>;
+  query: ReturnType<typeof useQuery<MessageLogRow[]>>;
   emptyTitle: string;
   emptyDescription: string;
-  onRetry?: (id: string) => void;
+  onRetry?: (row: MessageLogRow) => void;
   retryingId?: string;
 }) {
   if (query.error) {
@@ -298,12 +360,13 @@ function MessageList({
     <Card className="overflow-hidden">
       <div className="divide-y divide-border">
         {query.data.map((message, index) => {
-          const Icon = STATUS_ICONS[message.status];
+          const StatusIcon = STATUS_ICONS[message.status];
+          const ChannelIcon = CHANNEL_ICONS[message.channel];
           const isRetrying = retryingId === message.id;
 
           return (
             <motion.div
-              key={message.id}
+              key={`${message.channel}-${message.id}`}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: Math.min(index * 0.03, 0.25) }}
@@ -322,32 +385,33 @@ function MessageList({
                       'bg-destructive/10 text-destructive',
                   )}
                 >
-                  <Icon className="size-4" />
+                  <StatusIcon className="size-4" />
                 </div>
 
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                     <span className="text-sm font-medium">
-                      {message.member?.fullName ?? message.toPhone}
+                      {message.member?.fullName ?? message.to}
                     </span>
+                    <Badge variant="outline" size="sm" className="gap-1">
+                      <ChannelIcon className="size-3" />
+                      {message.channel === 'EMAIL' ? 'Email' : 'WhatsApp'}
+                    </Badge>
                     <Badge variant="secondary" size="sm">
-                      {SMS_TEMPLATE_LABELS[message.templateKey]}
+                      {message.templateLabel}
                     </Badge>
                     <Badge variant={STATUS_VARIANTS[message.status]} size="sm">
-                      {SMS_STATUS_LABELS[message.status]}
+                      {MESSAGE_STATUS_LABELS[message.status]}
                     </Badge>
                   </div>
 
-                  <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
-                    {message.body}
+                  <p className="mt-1.5 truncate text-[13px] leading-relaxed text-muted-foreground">
+                    {message.preview}
                   </p>
 
                   <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
                     <span>{formatDateTime(message.createdAt)}</span>
-                    <span>
-                      {message.segments} segment
-                      {message.segments === 1 ? '' : 's'}
-                    </span>
+                    <span>{message.to}</span>
                     {message.attempts > 1 && (
                       <span>
                         {message.attempts} of {message.maxAttempts} attempts
@@ -372,7 +436,7 @@ function MessageList({
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => onRetry(message.id)}
+                    onClick={() => onRetry(message)}
                     loading={isRetrying}
                     className="shrink-0"
                   >

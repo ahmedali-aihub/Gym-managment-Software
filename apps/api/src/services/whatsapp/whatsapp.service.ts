@@ -180,6 +180,32 @@ class WhatsAppService {
   }
 
   /** Rows due for another attempt, oldest first. */
+  /** Manually retry a failed WhatsApp message from the Messages UI. */
+  async retryMessage(whatsappLogId: string): Promise<WhatsAppLog> {
+    const whatsappLog = await prisma.whatsAppLog.findUniqueOrThrow({
+      where: { id: whatsappLogId },
+    });
+
+    // Give it a fresh budget; the operator has presumably fixed the cause.
+    const reset = await prisma.whatsAppLog.update({
+      where: { id: whatsappLogId },
+      data: {
+        status: WhatsAppStatus.QUEUED,
+        attempts: 0,
+        maxAttempts: Math.max(
+          whatsappLog.maxAttempts,
+          whatsappConfig.maxRetries,
+        ),
+        errorCode: null,
+        errorMessage: null,
+        nextRetryAt: null,
+        failedAt: null,
+      },
+    });
+
+    return this.attemptDelivery(reset);
+  }
+
   async getRetryable(limit = 25): Promise<WhatsAppLog[]> {
     return prisma.whatsAppLog.findMany({
       where: {
