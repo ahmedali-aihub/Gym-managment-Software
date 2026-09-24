@@ -278,8 +278,26 @@ ${issues}`,
 
 export const env: Env = parseEnv();
 
-export const isProduction = env.NODE_ENV === 'production';
-export const isDevelopment = env.NODE_ENV === 'development';
+/**
+ * Whether this is a real deployment, not a developer's laptop.
+ *
+ * NOT NODE_ENV ALONE. Vercel and Lambda set their own markers, and a
+ * deployment whose NODE_ENV was copied from a local .env — which is exactly
+ * what happened here — would otherwise run with the Secure flag off its
+ * session cookie, internal error details returned to clients, and rate
+ * limiting keyed to the proxy's IP rather than the caller's.
+ *
+ * Those are security properties. They should hold because the code is
+ * deployed, not because someone remembered to set a variable correctly in a
+ * dashboard.
+ */
+export const isProduction =
+  env.NODE_ENV === 'production' ||
+  Boolean(process.env.VERCEL ?? process.env.AWS_LAMBDA_FUNCTION_NAME);
+// Never true where isProduction is true: a deployment with a stale
+// NODE_ENV must not also count as development, or it would ask for
+// dev-only dependencies that are not installed there.
+export const isDevelopment = env.NODE_ENV === 'development' && !isProduction;
 export const isTest = env.NODE_ENV === 'test';
 
 /**
