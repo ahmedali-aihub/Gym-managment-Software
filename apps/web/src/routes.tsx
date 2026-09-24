@@ -62,9 +62,6 @@ const ExpensesPage = React.lazy(() =>
     default: m.ExpensesPage,
   })),
 );
-const LeadsPage = React.lazy(() =>
-  import('@/features/leads/leads-page').then((m) => ({ default: m.LeadsPage })),
-);
 const ReportsPage = React.lazy(() =>
   import('@/features/reports/reports-page').then((m) => ({
     default: m.ReportsPage,
@@ -169,7 +166,6 @@ export const router = createBrowserRouter([
       { path: 'plans', element: lazyRoute(PlansPage) },
       { path: 'check-in', element: lazyRoute(CheckInPage) },
       { path: 'messages', element: lazyRoute(MessagesPage) },
-      { path: 'leads', element: lazyRoute(LeadsPage) },
       { path: 'expenses', element: lazyRoute(ExpensesPage) },
       { path: 'reports', element: lazyRoute(ReportsPage) },
       { path: 'settings', element: lazyRoute(SettingsPage) },

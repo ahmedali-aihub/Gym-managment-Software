@@ -13,7 +13,6 @@ import {
   LayoutDashboard,
   LogOut,
   ScanLine,
-  Target,
   Wallet,
   MessageSquare,
   Monitor,
@@ -53,7 +52,6 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/check-in', label: 'Check-in', icon: ScanLine },
   { to: '/payments', label: 'Payments', icon: CreditCard },
   { to: '/messages', label: 'Messages', icon: MessageSquare },
-  { to: '/leads', label: 'Enquiries', icon: Target },
   {
     to: '/plans',
     label: 'Plans',

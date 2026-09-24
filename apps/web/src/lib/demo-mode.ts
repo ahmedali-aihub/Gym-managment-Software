@@ -25,8 +25,6 @@ import {
 } from './demo-extra';
 import {
   DEMO_EXPENSES,
-  DEMO_LEADS,
-  buildLeadStats,
   buildProfitAndLoss,
 } from './demo-business';
 
@@ -472,50 +470,6 @@ function route(
 
   if (/^\/expenses\/[^/]+$/.test(path) && (method === 'patch' || method === 'delete')) {
     return ok({ success: true, data: { id: path.split('/')[2] } }, config);
-  }
-
-  // ── Leads ──────────────────────────────────────────────────────────
-  if (path === '/leads/stats') {
-    return ok({ success: true, data: buildLeadStats() }, config);
-  }
-
-  if (path === '/leads' && method === 'get') {
-    let results = [...DEMO_LEADS];
-
-    if (params.dueOnly === true || params.dueOnly === 'true') {
-      const endOfToday = new Date();
-      endOfToday.setHours(23, 59, 59, 999);
-
-      results = results.filter(
-        (lead) =>
-          lead.followUpAt !== null &&
-          new Date(lead.followUpAt) <= endOfToday &&
-          lead.status !== 'CONVERTED' &&
-          lead.status !== 'LOST',
-      );
-    }
-
-    if (params.status) {
-      results = results.filter((lead) => lead.status === params.status);
-    }
-
-    const limit = Number(params.limit) || 20;
-    return ok({ success: true, ...paginate(results, 1, limit) }, config);
-  }
-
-  if (path === '/leads' && method === 'post') {
-    return ok({ success: true, data: { id: 'demo-lead-new' } }, config);
-  }
-
-  if (/^\/leads\/[^/]+\/(status|activity)$/.test(path) && method === 'post') {
-    return ok({ success: true, data: { id: 'demo-lead-updated' } }, config);
-  }
-
-  const leadMatch = /^\/leads\/([^/]+)$/.exec(path);
-  if (leadMatch && method === 'get') {
-    const lead = DEMO_LEADS.find((l) => l.id === leadMatch[1]);
-    if (!lead) return null;
-    return ok({ success: true, data: lead }, config);
   }
 
   // ── Attendance ─────────────────────────────────────────────────────
