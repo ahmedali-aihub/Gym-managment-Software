@@ -59,7 +59,7 @@ describe('safeRedirectPath — blocks external redirects', () => {
 });
 
 describe('safeRedirectPath — empty and malformed input', () => {
-  it.each([null, undefined, ''])('falls back for %j', (value) => {
+  it.each([null, undefined, ''])('falls back for %j', (value: null | undefined | string) => {
     expect(safeRedirectPath(value)).toBe('/dashboard');
   });
 

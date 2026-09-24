@@ -1,0 +1,16 @@
+{
+  // Build config for deployment.
+  //
+  // Identical to tsconfig.json except it excludes test files. The base
+  // config's "include": ["src"] pulls in every *.test.ts alongside app
+  // code, and vitest's ambient types normally paper over loose inference in
+  // test code (e.g. it.each with a mixed-type array). Vercel installs
+  // production dependencies only, so vitest is absent, that inference falls
+  // back to `any`, and noImplicitAny fails the build — on a file that has
+  // nothing to do with what's being shipped.
+  //
+  // The base config keeps tests in scope because `npm run typecheck` is
+  // where test code should be checked, with the full dev toolchain present.
+  "extends": "./tsconfig.json",
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
+}
