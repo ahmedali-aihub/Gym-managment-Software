@@ -31,7 +31,7 @@ import {
   buildPaginatedResponse,
   getSkipTake,
 } from '../../lib/pagination.js';
-import { prisma } from '../../lib/prisma.js';
+import { prisma, TRANSACTION_OPTIONS } from '../../lib/prisma.js';
 import { smsService } from '../../services/sms/sms.service.js';
 import { calculateBalance, derivePaymentStatus } from './billing.js';
 
@@ -132,7 +132,7 @@ class PaymentsService {
       }
 
       return created;
-    });
+    }, TRANSACTION_OPTIONS);
 
     const balance = await this.getMemberBalance(input.memberId);
 

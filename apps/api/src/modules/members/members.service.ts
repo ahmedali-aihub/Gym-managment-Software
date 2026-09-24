@@ -25,7 +25,7 @@ import {
   buildPaginatedResponse,
   getSkipTake,
 } from '../../lib/pagination.js';
-import { prisma } from '../../lib/prisma.js';
+import { prisma, TRANSACTION_OPTIONS } from '../../lib/prisma.js';
 import { nextMemberId } from '../../lib/sequences.js';
 import { generateQrDataUrl } from '../../services/qr/qr.service.js';
 import {
@@ -212,7 +212,7 @@ class MembersService {
         }
 
         return { member, membership, plan, bill, invoiceId };
-      });
+      }, TRANSACTION_OPTIONS);
 
       const qrDataUrl = await generateQrDataUrl(
         result.member.memberId,

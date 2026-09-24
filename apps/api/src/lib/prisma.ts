@@ -57,6 +57,30 @@ function createPrismaClient(): PrismaClient {
   return client;
 }
 
+/**
+ * Timeouts for interactive transactions.
+ *
+ * Prisma's defaults are 2s to acquire a connection and 5s to finish. Those
+ * assume a database on the same machine. This runs as a serverless function
+ * in one region talking to Supabase's pooler in another, and registration
+ * does seven sequential round trips — one of which takes a row lock to
+ * allocate the receipt number, so simultaneous registrations serialise
+ * behind each other by design.
+ *
+ * Two receptionists registering members at the same moment reliably exceeded
+ * 5s against the live deployment: one succeeded and the others failed with
+ * "a query cannot be executed on an expired transaction", after the member
+ * had already paid.
+ *
+ * Raised, not removed. A transaction that genuinely hangs must still fail
+ * rather than hold a lock for ever — 20s is long enough for a slow round
+ * trip under contention and short enough that a stuck one surfaces quickly.
+ */
+export const TRANSACTION_OPTIONS = {
+  maxWait: 10_000,
+  timeout: 20_000,
+} as const;
+
 export const prisma: PrismaClient =
   globalForPrisma.prisma ?? createPrismaClient();
 

@@ -124,7 +124,7 @@ class ImportService {
 
             imported++;
           }
-        }, { timeout: 30_000 });
+        }, { maxWait: 10_000, timeout: 30_000 });
       } catch (error) {
         const reason =
           error instanceof Error ? error.message.slice(0, 200) : String(error);

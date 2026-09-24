@@ -24,7 +24,7 @@ import {
   ValidationError,
 } from '../../lib/errors.js';
 import { moduleLogger } from '../../lib/logger.js';
-import { prisma } from '../../lib/prisma.js';
+import { prisma, TRANSACTION_OPTIONS } from '../../lib/prisma.js';
 import { smsService } from '../../services/sms/sms.service.js';
 import {
   calculateBill,
@@ -110,7 +110,7 @@ class MembershipsService {
       });
 
       return result;
-    });
+    }, TRANSACTION_OPTIONS);
 
     log.info({ membershipId: input.membershipId }, 'Membership frozen');
     return updated;
@@ -180,7 +180,7 @@ class MembershipsService {
       });
 
       return result;
-    });
+    }, TRANSACTION_OPTIONS);
 
     log.info(
       { membershipId, frozenDays, newEndDate },
@@ -322,7 +322,7 @@ class MembershipsService {
       });
 
       return newMembership;
-    });
+    }, TRANSACTION_OPTIONS);
 
     log.info(
       {
@@ -452,7 +452,7 @@ class MembershipsService {
       });
 
       return newMembership;
-    });
+    }, TRANSACTION_OPTIONS);
 
     log.info(
       { from: membership.id, to: created.id, remainingDays },
@@ -573,7 +573,7 @@ class MembershipsService {
       });
 
       return membership;
-    });
+    }, TRANSACTION_OPTIONS);
 
     log.info(
       { memberId: member.memberId, planName: plan.name },
