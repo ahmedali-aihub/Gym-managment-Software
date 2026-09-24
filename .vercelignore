@@ -1,0 +1,16 @@
+# Secrets never belong in a deployed bundle.
+#
+# Vercel's file tracer follows dotenv's read of .env and pulls the file into
+# the function. It is gitignored, so it never reaches GitHub — but a CLI
+# deploy uploads from this directory, which would ship the database password,
+# the Supabase service role key and the Gmail app password as a readable file
+# inside the deployment.
+#
+# Configuration comes from Vercel's own environment variables instead.
+.env
+.env.*
+!.env.example
+
+# Uploaded member photos live in Supabase Storage; this directory is only a
+# local development fallback and can be large.
+uploads
