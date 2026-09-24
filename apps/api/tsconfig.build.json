@@ -1,0 +1,17 @@
+{
+  // Build config for deployment.
+  //
+  // Identical to tsconfig.json except that it drops "vitest/globals" from
+  // types. Vercel installs production dependencies only, so vitest is not
+  // there, and asking for its types fails the build outright:
+  //
+  //     error TS2688: Cannot find type definition file for 'vitest/globals'
+  //
+  // The base config keeps them because `npm run typecheck` covers the test
+  // files too. Nothing under src/ uses them — tests are already excluded
+  // from the build — so removing them here changes no output.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"]
+  }
+}
