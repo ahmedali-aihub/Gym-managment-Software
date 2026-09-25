@@ -32,6 +32,7 @@ export interface AccessTokenClaims {
 
 export function signAccessToken(claims: AccessTokenClaims): string {
   return jwt.sign(claims, env.JWT_ACCESS_SECRET, {
+    algorithm: 'HS256',
     expiresIn: env.JWT_ACCESS_EXPIRES_IN,
     issuer: 'azf-api',
     audience: 'azf-web',
@@ -41,6 +42,12 @@ export function signAccessToken(claims: AccessTokenClaims): string {
 export function verifyAccessToken(token: string): JwtPayload {
   try {
     return jwt.verify(token, env.JWT_ACCESS_SECRET, {
+      // Pinned rather than left to whatever the token claims. jsonwebtoken
+      // verifies against the algorithm the TOKEN says it used unless told
+      // otherwise — harmless with a plain string secret today, but only
+      // because nothing here is an RSA/EC public key. Pinning removes that
+      // assumption as a thing that has to stay true forever.
+      algorithms: ['HS256'],
       issuer: 'azf-api',
       audience: 'azf-web',
     }) as JwtPayload;

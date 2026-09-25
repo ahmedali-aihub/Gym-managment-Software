@@ -1,9 +1,18 @@
-import { Role, messageLogQuerySchema } from '@azf/shared';
+import { Role, cuidSchema, messageLogQuerySchema } from '@azf/shared';
 import { Router } from 'express';
+import { z } from 'zod';
 import { authenticate, requireRole } from '../../middleware/auth.middleware.js';
 import { asyncHandler } from '../../middleware/error.middleware.js';
-import { validateQuery } from '../../middleware/validate.middleware.js';
+import {
+  validateParams,
+  validateQuery,
+} from '../../middleware/validate.middleware.js';
 import { messagesController } from './messages.controller.js';
+
+const retryParamsSchema = z.object({
+  channel: z.enum(['EMAIL', 'WHATSAPP']),
+  id: cuidSchema,
+});
 
 /**
  * Unified history over email and WhatsApp — the two channels the app
@@ -35,6 +44,7 @@ router.get('/provider', asyncHandler(messagesController.providerStatus));
 router.post(
   '/:channel/:id/retry',
   requireRole(Role.OWNER, Role.MANAGER, Role.RECEPTIONIST),
+  validateParams(retryParamsSchema),
   asyncHandler(messagesController.retry),
 );
 

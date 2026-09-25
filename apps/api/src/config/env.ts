@@ -234,7 +234,33 @@ const envSchema = z
   .refine((e) => e.JWT_ACCESS_SECRET !== e.JWT_REFRESH_SECRET, {
     message: 'JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must differ',
     path: ['JWT_REFRESH_SECRET'],
-  });
+  })
+  .refine(
+    (e) => {
+      // A real deployment (Vercel, Lambda) whose WEB_BASE_URL still points
+      // at localhost means the CORS allowlist trusts a URL that is not the
+      // real site — caught live once already: the production API answered
+      // every cross-origin preflight with
+      // "Access-Control-Allow-Origin: http://localhost:5173" regardless of
+      // the request's actual origin. The app worked anyway only because
+      // same-origin requests never consult CORS; anything that DID depend
+      // on this value being correct would have silently failed or, worse,
+      // silently trusted the wrong origin.
+      const onARealPlatform = Boolean(
+        process.env.VERCEL ?? process.env.AWS_LAMBDA_FUNCTION_NAME,
+      );
+      if (!onARealPlatform) return true;
+      return !/^https?:\/\/localhost(:\d+)?$/.test(e.WEB_BASE_URL);
+    },
+    {
+      message:
+        'WEB_BASE_URL is set to a localhost URL on a real deployment. ' +
+        'Set it to the actual production origin (e.g. https://your-app.vercel.app) ' +
+        'in the platform environment variables — CORS is otherwise trusting ' +
+        'a URL that is not the live site.',
+      path: ['WEB_BASE_URL'],
+    },
+  );
 
 export type Env = z.infer<typeof envSchema>;
 

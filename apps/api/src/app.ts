@@ -48,6 +48,12 @@ export function createApp(): Application {
       origin: env.WEB_BASE_URL,
       // Required for the httpOnly refresh-token cookie.
       credentials: true,
+      // Explicit allowlists rather than the library's default of reflecting
+      // whatever the preflight asks for. The app only ever needs these;
+      // anything else is refused rather than permitted by omission.
+      methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization'],
+      maxAge: 86400,
     }),
   );
 
