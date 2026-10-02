@@ -1,7 +1,7 @@
 import type { JwtPayload, Role } from '@azf/shared';
 import { ROLE_HIERARCHY } from '@azf/shared';
 import type { NextFunction, Request, Response } from 'express';
-import { ForbiddenError, UnauthorizedError } from '../lib/errors.js';
+import { AppError, ForbiddenError, UnauthorizedError } from '../lib/errors.js';
 import { prisma } from '../lib/prisma.js';
 import {
   extractBearerToken,
@@ -41,7 +41,13 @@ export async function authenticate(
 
     const user = await prisma.user.findFirst({
       where: { id: claims.sub, deletedAt: null },
-      select: { id: true, isActive: true, tokenVersion: true, role: true },
+      select: {
+        id: true,
+        isActive: true,
+        tokenVersion: true,
+        role: true,
+        mustChangePassword: true,
+      },
     });
 
     if (!user) {
@@ -56,6 +62,23 @@ export async function authenticate(
       throw new UnauthorizedError(
         'Session invalidated. Please sign in again.',
         'TOKEN_INVALID',
+      );
+    }
+
+    // Enforced here, not just shown by the client: a flag the frontend could
+    // choose to ignore is not a requirement. /me and /logout* stay open so a
+    // locked-out user can still see who they are and sign out; everything
+    // else is refused until the password is actually changed.
+    if (
+      user.mustChangePassword &&
+      req.path !== '/change-password' &&
+      req.path !== '/me' &&
+      !req.path.startsWith('/logout')
+    ) {
+      throw new AppError(
+        'Your password must be changed before continuing',
+        403,
+        'PASSWORD_CHANGE_REQUIRED',
       );
     }
 

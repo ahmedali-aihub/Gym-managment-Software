@@ -142,3 +142,59 @@ delivery is attempted, so a crash mid-send leaves them recoverable.
 **Permanent SMS errors are not retried.** An invalid number or a DND block
 fails identically every time; retrying only burns SMS credits. See
 `PERMANENT_ERROR_CODES` in `apps/api/src/services/sms/sms.service.ts`.
+
+## Row-Level Security (2 Oct 2026)
+
+Every table was publicly readable until this date. Supabase auto-generates a
+public REST API (PostgREST) over every table in the `public` schema unless
+RLS is explicitly enabled. Nobody had enabled it on any table since the
+project was created — confirmed live with a plain `curl` using only the
+public anon key (the one already embedded in the deployed JavaScript
+bundle), which returned real member records and a staff password hash with
+no authentication at all.
+
+Fixed in `prisma/migrations/20261002095930_enable_row_level_security`,
+applied directly to production. No policies are written — nothing should
+ever reach this data through Supabase's public API, only through this API
+server. The app is unaffected because Prisma connects as the `postgres`
+role, which has `rolbypassrls = true`; confirmed against the live database
+before the migration ran.
+
+**`_prisma_migrations` is RLS-enabled in production but not in that
+migration's SQL file.** Prisma creates that table itself, outside of any
+migration, before the first migration ever runs — a fresh environment's
+shadow database (used to validate new migrations) does not have it yet at
+that point in migration order, and an `ALTER TABLE` on it fails with
+"relation does not exist" the moment anyone adds a later migration.
+Production's copy was altered once, by hand, directly against the live
+database; it is not and should not be re-added to the migration file.
+
+**New environment setup checklist, because of this:** after a fresh
+`prisma migrate deploy` on any new database (a disaster-recovery restore, a
+second environment), run once, directly:
+
+```sql
+ALTER TABLE "public"."_prisma_migrations" ENABLE ROW LEVEL SECURITY;
+```
+
+Everything else is covered by the migration itself.
+
+## Forced password change (2 Oct 2026)
+
+All eight staff accounts — including the owner's — were created while the
+database above was still publicly readable, so every password hash was
+exposed for an unknown window before the fix. bcrypt hashes are crackable
+offline given enough time, so rotation could not be optional.
+
+`User.mustChangePassword` (default `false`) is checked in
+`authenticate()` on every request, not just shown as a prompt the client
+could choose to skip: once set, every endpoint except `/auth/me`,
+`/auth/change-password` and `/auth/logout*` returns 403
+`PASSWORD_CHANGE_REQUIRED` until the user actually changes it. A successful
+change clears the flag as part of the same transaction that rotates
+`tokenVersion` and revokes existing sessions.
+
+Set `true` administratively for all eight existing accounts as part of this
+fix. Never cleared automatically by anything except `changePassword()`
+itself — there is no backdoor path that marks it satisfied without a real
+password change.

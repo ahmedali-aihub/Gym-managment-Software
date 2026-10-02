@@ -82,6 +82,8 @@ export interface AuthUser {
   isActive: boolean;
   avatarUrl: string | null;
   lastLoginAt: string | null;
+  /** True forces the client to the change-password screen before anything else. */
+  mustChangePassword: boolean;
 }
 
 export interface AuthTokens {

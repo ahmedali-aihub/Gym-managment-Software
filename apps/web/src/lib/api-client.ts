@@ -139,6 +139,20 @@ api.interceptors.response.use(
       onSessionExpired();
     }
 
+    // Defense in depth: the server enforces this on every request regardless
+    // of what the client's in-memory user object says. A stale tab — open
+    // from before an admin set the flag — would otherwise keep calling
+    // endpoints that now 403 forever with no way out. A hard navigation
+    // (not React Router, which this module sits outside of) forces a fresh
+    // boot that reads the current mustChangePassword from /auth/me.
+    if (
+      status === 403 &&
+      code === 'PASSWORD_CHANGE_REQUIRED' &&
+      window.location.pathname !== '/change-password-required'
+    ) {
+      window.location.href = '/change-password-required';
+    }
+
     return Promise.reject(error);
   },
 );

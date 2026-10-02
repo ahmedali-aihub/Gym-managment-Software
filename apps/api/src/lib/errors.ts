@@ -14,6 +14,7 @@ export type ErrorCode =
   | 'TOKEN_EXPIRED'
   | 'TOKEN_INVALID'
   | 'FORBIDDEN'
+  | 'PASSWORD_CHANGE_REQUIRED'
   | 'NOT_FOUND'
   | 'CONFLICT'
   | 'DUPLICATE_ENTRY'

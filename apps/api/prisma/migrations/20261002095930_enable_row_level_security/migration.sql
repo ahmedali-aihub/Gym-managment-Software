@@ -48,4 +48,11 @@ ALTER TABLE "public"."audit_logs" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."expenses" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."leads" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."lead_activities" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "public"."_prisma_migrations" ENABLE ROW LEVEL SECURITY;
+
+-- _prisma_migrations is deliberately NOT altered here. Prisma creates that
+-- table itself outside of any migration file, before the first migration
+-- ever runs — so a fresh environment's shadow database (used to validate
+-- new migrations) does not have it yet at this point, and this statement
+-- fails with "relation does not exist" the moment anyone tries to add
+-- another migration. Production already has the table and was handled once,
+-- by hand, directly — see docs/SECURITY-NOTES.md.

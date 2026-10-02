@@ -7,6 +7,7 @@ import {
 } from 'react-router-dom';
 import { AppShell } from '@/components/layout/app-shell';
 import { AuthProvider, useAuth } from '@/features/auth/auth-context';
+import { ChangePasswordRequiredPage } from '@/features/auth/change-password-page';
 import { LoginPage } from '@/features/auth/login-page';
 
 /**
@@ -97,7 +98,7 @@ function RouteLoader() {
  * on every page reload.
  */
 function RequireAuth({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const location = useLocation();
 
   if (isLoading) return <FullPageLoader />;
@@ -110,6 +111,13 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
     return <Navigate to={`/login?next=${next}`} replace />;
   }
 
+  // Set administratively, never by the client — see change-password-page.tsx.
+  // The redirect here is a convenience; the server enforces the same rule on
+  // every request regardless of whether this ever renders.
+  if (user?.mustChangePassword) {
+    return <Navigate to="/change-password-required" replace />;
+  }
+
   return <>{children}</>;
 }
 
@@ -118,6 +126,23 @@ function RedirectIfAuthenticated({ children }: { children: React.ReactNode }) {
 
   if (isLoading) return <FullPageLoader />;
   if (isAuthenticated) return <Navigate to="/dashboard" replace />;
+
+  return <>{children}</>;
+}
+
+/**
+ * Guards /change-password-required specifically: must be signed in (an
+ * anonymous visitor has no password to change), but — unlike RequireAuth —
+ * does NOT redirect away for mustChangePassword, since this is where that
+ * redirect lands. Once the flag clears, there is nothing left to do here, so
+ * it sends the user on rather than showing a pointless form.
+ */
+function RequireForcedChange({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading, user } = useAuth();
+
+  if (isLoading) return <FullPageLoader />;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!user?.mustChangePassword) return <Navigate to="/dashboard" replace />;
 
   return <>{children}</>;
 }
@@ -143,6 +168,16 @@ export const router = createBrowserRouter([
         <RedirectIfAuthenticated>
           <LoginPage />
         </RedirectIfAuthenticated>
+      </Root>
+    ),
+  },
+  {
+    path: '/change-password-required',
+    element: (
+      <Root>
+        <RequireForcedChange>
+          <ChangePasswordRequiredPage />
+        </RequireForcedChange>
       </Root>
     ),
   },

@@ -176,6 +176,13 @@ model User {
   tokenVersion Int       @default(0)
   lastLoginAt  DateTime?
 
+  /// True forces a password change immediately after the next successful
+  /// login, before any other request succeeds. Set administratively — e.g.
+  /// every account's password was briefly readable by anyone while
+  /// Row-Level Security was off, so all eight were flagged this way rather
+  /// than trusting that nobody grabbed one in the meantime.
+  mustChangePassword Boolean @default(false)
+
   refreshTokens RefreshToken[]
 
   // Staff actions worth attributing

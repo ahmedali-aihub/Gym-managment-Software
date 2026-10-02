@@ -194,6 +194,9 @@ class AuthService {
           passwordHash: await hashPassword(input.newPassword),
           // Invalidates every live access token without a blocklist.
           tokenVersion: { increment: 1 },
+          // A successful change satisfies whatever forced it, administrative
+          // flag included — there is nothing left to force.
+          mustChangePassword: false,
         },
       }),
       prisma.refreshToken.updateMany({
@@ -336,6 +339,7 @@ function toAuthUser(user: User): AuthUser {
     isActive: user.isActive,
     avatarUrl: user.avatarUrl,
     lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
+    mustChangePassword: user.mustChangePassword,
   };
 }
 
