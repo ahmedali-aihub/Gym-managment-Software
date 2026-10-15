@@ -14,6 +14,7 @@ import {
   WhatsAppTemplateKey,
   calculateExpiryDate,
   formatDate,
+  normalizePhone,
   paiseToRupees,
 } from '@azf/shared';
 import type { Member, Prisma } from '@prisma/client';
@@ -444,12 +445,34 @@ class MembersService {
 
     if (params.search) {
       const term = params.search.trim();
+      const digits = term.replace(/\D/g, '');
+
       where.OR = [
         { fullName: { contains: term, mode: 'insensitive' } },
         { memberId: { contains: term, mode: 'insensitive' } },
-        { phone: { contains: term.replace(/\D/g, '') } },
         { email: { contains: term, mode: 'insensitive' } },
       ];
+
+      // Phone numbers are stored as bare 10 digits (see normalizePhone),
+      // but staff type them every way a phone number gets written: with a
+      // +91 country code, a leading 0, spaces, or none of that. Matching
+      // raw digits-with-punctuation-stripped against a 10-digit column
+      // fails the instant a country code is present — "+91 89786 05881"
+      // strips to "918978605881", which is not a substring of
+      // "8978605881". Normalising first (same rule used at login) finds
+      // it either way, and a partial number — the last 6 digits someone
+      // remembers — still matches via `contains`.
+      if (digits.length >= 4) {
+        where.OR.push({ phone: { contains: normalizePhone(digits) } });
+        // normalizePhone only rewrites when the length implies a country
+        // code or leading 0; for anything else it returns the digits
+        // unchanged, which is already covered above — but a short partial
+        // search (fewer than 10 digits) never triggers that rewrite, so it
+        // needs its own, un-normalised branch to still match a substring.
+        if (normalizePhone(digits) !== digits) {
+          where.OR.push({ phone: { contains: digits } });
+        }
+      }
     }
 
     if (params.status) where.status = params.status;
