@@ -1,4 +1,5 @@
 import {
+  formatDate,
   formatINR,
   formatINRCompact,
   formatTime,
@@ -49,7 +50,27 @@ import {
 import { RenewalReminderDialog } from '@/features/members/renewal-reminder-dialog';
 import { AnalyticsPanel, TodayCollectionCard } from './analytics-panel';
 import { KpiCard } from './kpi-card';
-import { PeriodFilter, usePeriod } from './period-filter';
+import { PERIODS, PeriodFilter, usePeriod, type PeriodKey } from './period-filter';
+import type { DateRange } from '@/components/common/date-range-picker';
+
+/**
+ * The phrase a chart title appends, e.g. "Revenue by day — This quarter".
+ *
+ * The charts themselves were already correctly scoped by the period filter
+ * (see the dashboard query above) — what was missing was ever saying so. A
+ * fixed title of "Revenue by month" sitting over a chart that had, in fact,
+ * just redrawn itself for "This quarter" read as proof the filter still did
+ * nothing, even on the one date — the first days of a new quarter — where
+ * the two periods' figures are coincidentally identical and the chart was
+ * telling the truth the whole time.
+ */
+function periodLabel(period: PeriodKey, range: DateRange | null): string {
+  if (period === 'custom') {
+    if (!range) return 'Custom range';
+    return `${formatDate(range.from)} – ${formatDate(range.to)}`;
+  }
+  return PERIODS.find((p) => p.key === period)?.label ?? '';
+}
 
 interface DashboardData {
   overview: {
@@ -250,8 +271,8 @@ export function DashboardPage() {
       <div className="grid gap-4 lg:grid-cols-3">
         <ChartCard
           className="lg:col-span-2"
-          title="Revenue by month"
-          description="Collections per month with the trend and average marked"
+          title={`Revenue — ${periodLabel(period, range)}`}
+          description="Collections over the period, with the trend and average marked"
           loading={isLoading}
         >
           {data && <RevenueTrendChart data={data.revenueTrend} />}
@@ -278,7 +299,7 @@ export function DashboardPage() {
         <ChartCard
           className="lg:col-span-2"
           title="Net member change"
-          description="Above the line the gym grew; below it shrank"
+          description={`Above the line the gym grew; below it shrank — ${periodLabel(period, range)}`}
           loading={isLoading}
         >
           {data && <MemberGrowthChart data={data.memberGrowth} />}
@@ -286,7 +307,7 @@ export function DashboardPage() {
 
         <ChartCard
           title="How members pay"
-          description="Collections in the last 90 days"
+          description={`Collections — ${periodLabel(period, range)}`}
           loading={isLoading}
         >
           {data &&
