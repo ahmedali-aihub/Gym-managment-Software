@@ -112,11 +112,29 @@ export function DashboardPage() {
   const [remindersOpen, setRemindersOpen] = React.useState(false);
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['dashboard'],
+    // period and range are part of the key, same as AnalyticsPanel's own
+    // query below — without them, changing the filter never refetches:
+    // React Query sees an unchanged key and serves the first response it
+    // ever got, forever. That is the exact bug this was shipped with: the
+    // four KPI tiles above are correctly unscoped (a member is active right
+    // now, not "active for this month"), but revenueTrend, memberGrowth,
+    // planDistribution and paymentModes all genuinely change with the
+    // period on the server — the frontend just never asked for that.
+    queryKey: ['dashboard', period, range?.from ?? '', range?.to ?? ''],
     queryFn: async () => {
-      const response = await api.get<{ data: DashboardData }>('/dashboard');
+      const response = await api.get<{ data: DashboardData }>('/dashboard', {
+        params: {
+          period,
+          ...(period === 'custom' && range
+            ? { from: range.from, to: range.to }
+            : {}),
+        },
+      });
       return response.data.data;
     },
+    // A custom period without both ends chosen would ask the API for a
+    // window it cannot resolve — same guard AnalyticsPanel uses.
+    enabled: period !== 'custom' || Boolean(range?.from && range?.to),
     // The check-in feed and expiry counts go stale quickly during opening
     // hours; a minute keeps them current without hammering the API.
     refetchInterval: 60_000,

@@ -90,7 +90,26 @@ export function KpiCard({
     [],
   );
 
-  const animated = useAnimatedNumber(value, !loading && !prefersReducedMotion);
+  // Changing the dashboard's period filter re-fetches under a brand new
+  // React Query key, which reports loading even for figures — like total
+  // members — that do not actually change with the period. `value` during
+  // that window is the caller's fallback (`overview?.x ?? 0`), not a real
+  // reading. Feeding that into the animation was the bug: once the real
+  // value arrived and happened to match wherever the spring had already
+  // settled (common, since most of these numbers ARE the same across
+  // periods), setting it was a no-op — nothing changed, so the spring
+  // never fired a 'change' event, and the displayed number stayed stuck at
+  // the fallback 0 with no skeleton left to hide it. Holding the last real
+  // value steady through a loading window — rather than resetting toward
+  // the fallback and hoping a later update corrects it — means there is
+  // always a next real value for the animation to actually move to.
+  const lastRealValue = React.useRef(value);
+  if (!loading) lastRealValue.current = value;
+
+  const animated = useAnimatedNumber(
+    loading ? lastRealValue.current : value,
+    !loading && !prefersReducedMotion,
+  );
 
   if (loading) return <KpiCardSkeleton />;
 
