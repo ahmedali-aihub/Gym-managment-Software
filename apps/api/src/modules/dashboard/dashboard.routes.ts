@@ -81,8 +81,22 @@ function widenForCharts(
   period?: PeriodKey,
 ): ChartRange {
   const dayMs = 24 * 60 * 60 * 1000;
+
+  // Normalise BOTH ends to midnight before diffing. range.from is already
+  // midnight, but range.to is end-of-day (23:59:59.999) for every period
+  // that resolves "now" — a single calendar day then spans just under
+  // dayMs, not dayMs, and the +1 below silently over-counts by exactly one.
+  // Caught because it broke the one case that sits on the threshold's own
+  // boundary: a Monday — genuinely 1 real day — was computing as 2 days,
+  // which is not < 2, so it never widened and rendered as the single
+  // useless bar this whole function exists to prevent.
+  const fromMidnight = new Date(range.from);
+  fromMidnight.setHours(0, 0, 0, 0);
+  const toMidnight = new Date(range.to);
+  toMidnight.setHours(0, 0, 0, 0);
+
   const days =
-    Math.round((range.to.getTime() - range.from.getTime()) / dayMs) + 1;
+    Math.round((toMidnight.getTime() - fromMidnight.getTime()) / dayMs) + 1;
 
   const threshold = period === 'week' ? 2 : 7;
   if (days >= threshold) return range;
