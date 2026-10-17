@@ -49,11 +49,11 @@ function resolveChartRange(
       from: customFrom,
       to: customTo,
     });
-    return widenForCharts({ from: range.from, to: range.to });
+    return widenForCharts({ from: range.from, to: range.to }, period);
   }
 
   const range = resolvePeriod(period);
-  return widenForCharts({ from: range.from, to: range.to });
+  return widenForCharts({ from: range.from, to: range.to }, period);
 }
 
 /**
@@ -61,19 +61,31 @@ function resolveChartRange(
  *
  * "Today", and "this week" on a Monday, are one day — arithmetically right
  * and visually useless: a single bar shows no trend, no comparison, nothing
- * the chart exists for. Charts below a week are extended BACKWARDS to 14
- * days so the selected period sits at the right-hand edge with its recent
+ * the chart exists for. Charts below the threshold are extended BACKWARDS to
+ * 14 days so the selected period sits at the right-hand edge with its recent
  * history behind it.
  *
  * Only the CHARTS widen. The KPI figures keep the exact window the owner
  * chose — "collected today" must mean today, or the number is a lie.
+ *
+ * WEEK USES ITS OWN, LOWER FLOOR. A week's entire natural length is 7 days,
+ * so the shared "fewer than 7 days is too sparse" rule — correct for a
+ * month or quarter only a few days old — flags a week as sparse right up
+ * until its very last day. A Saturday ("This week" = Mon–Sat, 6 real days)
+ * was being silently doubled to 14 days with no sign anything had changed,
+ * while the title still read "This week". The genuinely sparse case this
+ * function exists for is a week that just started: a Monday or Tuesday.
  */
-function widenForCharts(range: ChartRange): ChartRange {
+function widenForCharts(
+  range: ChartRange,
+  period?: PeriodKey,
+): ChartRange {
   const dayMs = 24 * 60 * 60 * 1000;
   const days =
     Math.round((range.to.getTime() - range.from.getTime()) / dayMs) + 1;
 
-  if (days >= 7) return range;
+  const threshold = period === 'week' ? 2 : 7;
+  if (days >= threshold) return range;
 
   const from = new Date(range.to);
   from.setDate(from.getDate() - 13);
