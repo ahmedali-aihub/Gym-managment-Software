@@ -344,7 +344,7 @@ export function loadLegacy(): Legacy {
 
     const memberships = (membershipsByMember.get(om.id) ?? [])
       .map(toMembership)
-      .sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+      .sort((a, b) => a.startDate.getTime() - b.startDate.getTime() || a.endDate.getTime() - b.endDate.getTime());
 
     const latest = memberships.at(-1);
     const status: MemberRow['status'] = memberships.some((m) => m.status === 'ACTIVE')
