@@ -21,7 +21,12 @@
  *
  * PAYMENTS ARE REAL, SO RECEIPTS ARE TOO. Each old payment becomes a Payment
  * plus an Invoice numbered FGS/<old receipt no>, outside our RCPT/ sequence
- * so neither numbering can collide with the other.
+ * so neither numbering can collide with the other. The two payments the old
+ * system recorded without a receipt are imported without one.
+ *
+ * MEMBER NUMBERS. --plans also points the member counter past the highest
+ * old number, so a registration made at the desk mid-import can never take
+ * a number an old member is about to be imported with.
  *
  * Uses DIRECT_URL: the transaction pooler hangs on long-running scripts
  * from outside Supabase, and this holds a connection for the whole import.
@@ -52,7 +57,10 @@ const prisma = new PrismaClient({
 
 const PHOTO_TYPES: Record<string, string> = { '.jpg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp' };
 
-async function importPlans(plans: ReturnType<typeof loadLegacy>['plans']): Promise<void> {
+async function importPlans(
+  plans: ReturnType<typeof loadLegacy>['plans'],
+  highestOldMemberNumber: number,
+): Promise<void> {
   const existing = await prisma.plan.findMany({
     include: { _count: { select: { memberships: true, quotedLeads: true } } },
   });
@@ -66,6 +74,7 @@ async function importPlans(plans: ReturnType<typeof loadLegacy>['plans']): Promi
   }
   const toCreate = plans.filter((p) => !existing.some((e) => e.name === p.name));
   console.log(`Create ${toCreate.length} plan(s) from the old system.`);
+  console.log(`Set the member counter to ${highestOldMemberNumber}; the next registration gets ${highestOldMemberNumber + 1}.`);
   if (!commit) return;
 
   await prisma.$transaction(async (tx) => {
@@ -83,8 +92,17 @@ async function importPlans(plans: ReturnType<typeof loadLegacy>['plans']): Promi
         },
       });
     }
+    // Year 0 is the gym-wide counter row (see nextMemberId). GREATEST so a
+    // re-run never winds the counter back below numbers already issued.
+    await tx.$executeRaw`
+      INSERT INTO member_sequences (id, year, "lastSequence", "updatedAt")
+      VALUES (${randomUUID()}, 0, ${highestOldMemberNumber}, NOW())
+      ON CONFLICT (year) DO UPDATE
+      SET "lastSequence" = GREATEST(member_sequences."lastSequence", EXCLUDED."lastSequence"),
+          "updatedAt" = NOW()
+    `;
   });
-  console.log('Plans replaced.');
+  console.log('Plans replaced and member counter set.');
 }
 
 async function uploadMemberPhoto(member: MemberRow, photoFiles: Map<string, string>): Promise<string | null> {
@@ -147,10 +165,13 @@ async function importMember(member: MemberRow, planIds: Map<string, string>, pho
               notes: pay.notes,
               paidAt: pay.paidAt,
               // Re-running can never double-import the same old payment.
-              idempotencyKey: `fitgym-payment-${pay.oldId}`,
+              idempotencyKey: pay.key,
               createdAt: pay.paidAt,
             },
           });
+          // A payment the old system never receipted gets no receipt here
+          // either; inventing a document number would misstate the books.
+          if (pay.receiptNumber === null) continue;
           await tx.invoice.create({
             data: {
               invoiceNumber: `FGS/${pay.receiptNumber}`,
@@ -189,7 +210,7 @@ async function main(): Promise<void> {
   const legacy = loadLegacy();
 
   if (args.includes('--plans')) {
-    await importPlans(legacy.plans);
+    await importPlans(legacy.plans, Math.max(...legacy.members.map((m) => Number(m.memberId))));
     return;
   }
 

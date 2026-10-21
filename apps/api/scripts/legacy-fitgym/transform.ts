@@ -65,7 +65,11 @@ export interface PlanRow {
 }
 
 export interface PaymentRow {
-  oldId: number; receiptNumber: string; amountPaise: number;
+  /** Unique per payment; becomes the idempotency key. */
+  key: string;
+  /** Null for a payment the old system recorded without any receipt. */
+  receiptNumber: string | null;
+  amountPaise: number;
   mode: 'CASH' | 'UPI' | 'CARD' | 'NET_BANKING' | 'ONLINE';
   paidAt: Date; notes: string;
   /** Snapshot of the old record's mode name, e.g. "Google Pay". */
@@ -173,6 +177,11 @@ function cleanPhone(raw: string | null): { phone: string; warning: string | null
 
 const tidyName = (name: string) => name.replace(/\s+/g, ' ').trim();
 
+/** Old names are kept exactly, except one typo the owner asked to correct. */
+const fixPlanName = (name: string) => name.trim().replace(/\bANUUAL\b/, 'ANNUAL');
+
+export const NO_RECEIPT_NOTE = 'Marked paid in old system, no receipt found';
+
 // ─── Transform ──────────────────────────────────────────────────────────────
 
 export interface Legacy {
@@ -210,7 +219,7 @@ export function loadLegacy(): Legacy {
       const placeholder = isPlaceholderPrice(p);
       return {
         oldId: p.id,
-        name: p.membership.trim(),
+        name: fixPlanName(p.membership),
         type: planType(p.months, p.days),
         durationDays: durationDays(p.months, p.days),
         pricePaise: placeholder
@@ -275,7 +284,7 @@ export function loadLegacy(): Legacy {
     const payments = (paymentsByMembership.get(m.id) ?? []).map((inv): PaymentRow => {
       const oldMode = inv.paymentModeName;
       return {
-        oldId: inv.id,
+        key: `fitgym-payment-${inv.id}`,
         receiptNumber: inv.paymentLocalId,
         amountPaise: rupeesToPaise(inv.amount),
         mode: PAYMENT_MODES[oldMode.trim().toLowerCase()] ?? 'ONLINE',
@@ -284,6 +293,25 @@ export function loadLegacy(): Legacy {
         notes: [`Old receipt #${inv.paymentLocalId}`, oldMode, inv.remark?.trim()].filter(Boolean).join(' · '),
       };
     });
+
+    // The old system marks a few memberships paid with no receipt behind
+    // them. The owner confirmed they were paid, so the gap is recorded as a
+    // payment, dated the membership start, with no receipt issued for it.
+    // The mode was never recorded; CASH is only because the column is required.
+    const receiptedPaise = payments.reduce((sum, p) => sum + p.amountPaise, 0);
+    const unreceiptedPaise = rupeesToPaise(m.paidAmount) - receiptedPaise;
+    if (unreceiptedPaise > 0) {
+      payments.push({
+        key: `fitgym-no-receipt-${m.id}`,
+        receiptNumber: null,
+        amountPaise: unreceiptedPaise,
+        mode: 'CASH',
+        paidAt: istStartOfDay(m.startDate),
+        oldMode: 'not recorded',
+        notes: `${NO_RECEIPT_NOTE} (payment mode not recorded)`,
+      });
+    }
+
     const paidPaise = payments.reduce((sum, p) => sum + p.amountPaise, 0);
     return {
       oldId: m.id,
