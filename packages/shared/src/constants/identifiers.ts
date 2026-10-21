@@ -6,21 +6,22 @@
  * primary keys; the database uses cuids internally.
  */
 
-/** AZF-2026-0001 — Member ID, sequential within a calendar year. */
-export const MEMBER_ID_PREFIX = 'AZF';
-export const MEMBER_ID_PATTERN = /^AZF-\d{4}-\d{4,}$/;
-export const MEMBER_ID_SEQUENCE_PAD = 4;
+/**
+ * 6345 — Member ID, one gym-wide counter.
+ *
+ * Plain numbers because members already know theirs: the series continues
+ * the one FitGymSoftware used, so a member who has been #1067 since 2019
+ * keeps that number and new registrations carry on after the highest.
+ */
+export const MEMBER_ID_PATTERN = /^\d+$/;
 
-export function formatMemberId(year: number, sequence: number): string {
-  return `${MEMBER_ID_PREFIX}-${year}-${String(sequence).padStart(MEMBER_ID_SEQUENCE_PAD, '0')}`;
+export function formatMemberId(sequence: number): string {
+  return String(sequence);
 }
 
-export function parseMemberId(
-  memberId: string,
-): { year: number; sequence: number } | null {
-  const match = /^AZF-(\d{4})-(\d{4,})$/.exec(memberId.trim().toUpperCase());
-  if (!match?.[1] || !match[2]) return null;
-  return { year: Number(match[1]), sequence: Number(match[2]) };
+export function parseMemberId(memberId: string): number | null {
+  const trimmed = memberId.trim();
+  return MEMBER_ID_PATTERN.test(trimmed) ? Number(trimmed) : null;
 }
 
 /** INV/2026-27/0001 — Invoice number, scoped to the Indian financial year. */

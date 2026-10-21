@@ -730,7 +730,7 @@ class MembersService {
     return member;
   }
 
-  /** Look up by the printed AZF-YYYY-NNNN code — used at the front desk. */
+  /** Look up by the printed member number — used at the front desk. */
   async getByMemberId(memberId: string): Promise<Member> {
     const member = await prisma.member.findFirst({
       where: { memberId: memberId.trim().toUpperCase(), deletedAt: null },

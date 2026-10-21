@@ -69,10 +69,9 @@ class ImportService {
             const member = row.member!;
             const joinedAt = member.joinedAt ?? new Date();
 
-            // Member IDs are per-year, so a member who joined in 2019 gets
-            // an AZF-2019-nnnn code rather than being renumbered into this
-            // year's sequence.
-            const memberCode = await nextMemberId(tx, joinedAt.getFullYear());
+            // A spreadsheet carries no member number, so these join the end
+            // of the gym-wide series like any new registration.
+            const memberCode = await nextMemberId(tx);
 
             const created = await tx.member.create({
               data: {

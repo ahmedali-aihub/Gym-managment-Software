@@ -7,7 +7,7 @@ import QRCode from 'qrcode';
  * The encoded payload is `AZF:MEMBER:<memberId>:<qrToken>` — the printed
  * member ID plus a secret token held on the member record.
  *
- * Including the secret matters: a QR encoding only "AZF-2026-0042" could be
+ * Including the secret matters: a QR encoding only "6345" could be
  * forged by anyone who has seen one member's card and can count. The token
  * makes a pass unguessable, and rotating it invalidates a screenshotted or
  * shared pass without reissuing the member's printed ID.

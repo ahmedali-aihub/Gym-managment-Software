@@ -166,7 +166,7 @@ function buildMembers(count: number): DemoMember[] {
 
     members.push({
       id: `demo-member-${i + 1}`,
-      memberId: `AZF-${joinedAt.getFullYear()}-${String(i + 1).padStart(4, '0')}`,
+      memberId: String(i + 1),
       fullName,
       phone,
       email: chance(0.55)

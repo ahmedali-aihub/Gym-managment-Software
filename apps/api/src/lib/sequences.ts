@@ -4,6 +4,7 @@ import {
   formatMemberId,
   formatReceiptNumber,
 } from '@azf/shared';
+import { randomUUID } from 'node:crypto';
 import type { Prisma } from '@prisma/client';
 
 /**
@@ -27,34 +28,43 @@ import type { Prisma } from '@prisma/client';
  */
 
 /**
- * Next member ID for the current calendar year, e.g. AZF-2026-0001.
- * Resets each January.
+ * The member ID counter is a single gym-wide row. It reuses the
+ * member_sequences table, which was keyed by calendar year when IDs looked
+ * like AZF-2026-0001; year 0 is that one row, so no migration was needed.
+ */
+const MEMBER_COUNTER_ROW = 0;
+
+/**
+ * Next member ID, e.g. 6373 — one past the highest ever issued.
  */
 export async function nextMemberId(
   tx: Prisma.TransactionClient,
-  year: number = new Date().getFullYear(),
 ): Promise<string> {
-  // upsert seeds the counter the first time a year is used; the atomic
-  // increment then hands out one value per caller.
-  await tx.memberSequence.upsert({
-    where: { year },
-    create: { year, lastSequence: 0 },
-    update: {},
-  });
+  // The first call seeds the counter from the highest numeric ID already in
+  // the table rather than from zero. Imported members keep their old
+  // numbers, and a counter starting at 0 would hand out #1 a second time.
+  await tx.$executeRaw`
+    INSERT INTO member_sequences (id, year, "lastSequence", "updatedAt")
+    SELECT ${randomUUID()}, ${MEMBER_COUNTER_ROW},
+           COALESCE(MAX("memberId"::int), 0), NOW()
+    FROM members
+    WHERE "memberId" ~ '^[0-9]+$'
+    ON CONFLICT (year) DO NOTHING
+  `;
 
   const [row] = await tx.$queryRaw<Array<{ lastSequence: number }>>`
     UPDATE member_sequences
     SET "lastSequence" = "lastSequence" + 1,
         "updatedAt" = NOW()
-    WHERE year = ${year}
+    WHERE year = ${MEMBER_COUNTER_ROW}
     RETURNING "lastSequence"
   `;
 
   if (!row) {
-    throw new Error(`Failed to allocate a member ID for ${year}`);
+    throw new Error('Failed to allocate a member ID');
   }
 
-  return formatMemberId(year, row.lastSequence);
+  return formatMemberId(row.lastSequence);
 }
 
 /**

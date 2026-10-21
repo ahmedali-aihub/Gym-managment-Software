@@ -259,7 +259,8 @@ model TrainerProfile {
 
 model Member {
   id       String @id @default(cuid())
-  /// Human-facing ID: AZF-2026-0001. Unique, printed on the card.
+  /// Human-facing member number, e.g. 6345. Unique, printed on the card.
+  /// Continues the FitGymSoftware numbering; see nextMemberId.
   memberId String @unique
 
   fullName    String

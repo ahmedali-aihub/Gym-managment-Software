@@ -300,7 +300,7 @@ async function main(): Promise<void> {
       randomInt(1, 28),
     );
 
-    const memberId = `AZF-${joinedAt.getFullYear()}-${String(++memberSequence).padStart(4, '0')}`;
+    const memberId = String(++memberSequence);
 
     // Discount on roughly one in six memberships, as a real gym would give.
     const discountPaise = chance(0.17)
@@ -552,17 +552,10 @@ async function main(): Promise<void> {
   // ── Sequences ──────────────────────────────────────────────────────────
   // Set to the highest ID issued, so the next real registration continues
   // the series rather than colliding with a seeded member.
-  const byYear = new Map<number, number>();
-  for (const member of createdMembers) {
-    const [, yearStr, seqStr] = member.memberId.split('-');
-    const year = Number(yearStr);
-    const seq = Number(seqStr);
-    byYear.set(year, Math.max(byYear.get(year) ?? 0, seq));
-  }
-
-  for (const [year, lastSequence] of byYear) {
-    await prisma.memberSequence.create({ data: { year, lastSequence } });
-  }
+  // Year 0 is the single gym-wide counter row; see nextMemberId.
+  await prisma.memberSequence.create({
+    data: { year: 0, lastSequence: memberSequence },
+  });
 
   // ── Settings ───────────────────────────────────────────────────────────
   await prisma.setting.createMany({

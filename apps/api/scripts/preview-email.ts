@@ -40,7 +40,7 @@ const SAMPLES: Record<string, Record<string, string | number>> = {
   WELCOME: {
     ...gym,
     name: 'Aarav Yadav',
-    memberId: 'AZF-2026-0201',
+    memberId: '201',
     plan: 'Quarterly',
     startDate: '21/09/2026',
     expiryDate: '20/12/2026',
@@ -49,7 +49,7 @@ const SAMPLES: Record<string, Record<string, string | number>> = {
   RECEIPT: {
     ...gym,
     name: 'Priya Reddy & Family',
-    memberId: 'AZF-2026-0182',
+    memberId: '182',
     receiptNo: 'AZF/2026-27/0043',
     paidDate: '21/09/2026',
     mode: 'UPI',
@@ -59,14 +59,14 @@ const SAMPLES: Record<string, Record<string, string | number>> = {
   EXPIRY_REMINDER: {
     ...gym,
     name: 'Mohammed Sohail Ahmed',
-    memberId: 'AZF-2026-0117',
+    memberId: '117',
     expiryDate: '28/09/2026',
     days: 7,
   },
   PAYMENT_DUE: {
     ...gym,
     name: 'Ramesh Goud',
-    memberId: 'AZF-2026-0016',
+    memberId: '16',
     amount: '500',
   },
 };

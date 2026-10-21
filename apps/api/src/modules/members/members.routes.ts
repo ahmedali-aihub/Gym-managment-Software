@@ -26,7 +26,7 @@ router.get(
 
 router.get('/stats', asyncHandler(membersController.stats));
 
-/** Front-desk lookup by the printed AZF-YYYY-NNNN code. */
+/** Front-desk lookup by the printed member number. */
 router.get('/code/:memberId', asyncHandler(membersController.getByMemberId));
 
 router.get('/:id', asyncHandler(membersController.getProfile));

@@ -209,7 +209,7 @@ export function CheckInPage() {
                     ref={inputRef}
                     value={input}
                     onChange={(event) => setInput(event.target.value)}
-                    placeholder="Scan QR or type AZF-2026-0001"
+                    placeholder="Scan QR or type member number"
                     icon={<ScanLine />}
                     autoComplete="off"
                     // Scanners emit characters fast; autocorrect on mobile

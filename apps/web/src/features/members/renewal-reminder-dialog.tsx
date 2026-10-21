@@ -136,7 +136,7 @@ export function RenewalReminderDialog({
   const preview = React.useMemo(() => {
     const first = selected[0];
     const name = first?.member.fullName.split(' ')[0] ?? 'there';
-    const memberCode = first?.member.memberId ?? 'AZF-2026-0000';
+    const memberCode = first?.member.memberId ?? '0000';
     const expiry = first?.endDate ? formatDate(first.endDate) : '—';
 
     return kind === 'EXPIRY_REMINDER'
