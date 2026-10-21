@@ -57,9 +57,26 @@ async function main(): Promise<void> {
     }
 
     expectEq(at, 'membership count', dbm.memberships.length, src.memberships.length);
+    // Pair by content, not position: some members bought two plans on the
+    // same day with the same end date, so no sort order tells them apart.
+    // A payment key pins a membership exactly; plan, dates and total settle
+    // the rest. Each database row is used at most once.
+    const unclaimed = [...dbm.memberships];
     src.memberships.forEach((sm, i) => {
-      const ms = dbm.memberships[i];
+      const keys = new Set(sm.payments.map((p) => p.key));
+      const sameShape = (x: (typeof unclaimed)[number]) =>
+        x.plan.name === sm.planName && x.startDate.getTime() === sm.startDate.getTime() &&
+        x.endDate.getTime() === sm.endDate.getTime() && x.totalPaise === sm.totalPaise;
+      const idx = unclaimed.findIndex((x) =>
+        keys.size ? x.payments.some((p) => p.idempotencyKey && keys.has(p.idempotencyKey)) : sameShape(x) && x.payments.length === 0,
+      );
+      const fallback = idx >= 0 ? idx : unclaimed.findIndex(sameShape);
       const mat = `${at} membership ${i + 1} (${sm.planName})`;
+      if (fallback < 0) {
+        problems.push(`${mat} has no matching membership in the database`);
+        return;
+      }
+      const [ms] = unclaimed.splice(fallback, 1);
       if (!ms) return;
       expectEq(mat, 'plan', ms.plan.name, sm.planName);
       for (const field of ['startDate', 'endDate', 'status', 'pricePaise', 'discountPaise', 'totalPaise',
