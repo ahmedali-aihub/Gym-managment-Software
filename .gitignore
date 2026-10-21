@@ -55,3 +55,4 @@ desktop.ini
 
 # Local dev overrides (demo mode toggle)
 .env.local
+backups/
