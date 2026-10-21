@@ -32,7 +32,7 @@
  * from outside Supabase, and this holds a connection for the whole import.
  */
 import { randomUUID } from 'node:crypto';
-import { readFile, readdir } from 'node:fs/promises';
+import { readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient, type Prisma } from '@prisma/client';
@@ -284,6 +284,9 @@ async function main(): Promise<void> {
     },
   });
 
+  // Kept for the post-import report; a re-run retries these automatically,
+  // since a failed member was never written.
+  await writeFile(path.join(BACKUPS, 'fitgym/import-failures.json'), JSON.stringify(failed, null, 1));
   console.log(`Imported ${imported}, failed ${failed.length}.`);
 }
 
