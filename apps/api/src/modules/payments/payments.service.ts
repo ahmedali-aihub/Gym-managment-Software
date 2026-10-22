@@ -35,7 +35,7 @@ import {
 import { prisma, TRANSACTION_OPTIONS } from '../../lib/prisma.js';
 import { smsService } from '../../services/sms/sms.service.js';
 import { calculateBalance, derivePaymentStatus } from './billing.js';
-import { getDuesSummary } from './dues.js';
+import { MEMBER_BALANCES, getDuesSummary } from './dues.js';
 
 const log = moduleLogger('payments');
 
@@ -567,27 +567,11 @@ class PaymentsService {
         balanceDuePaise: bigint | number | string;
       }>
     >`
-      SELECT m.id, m."memberId", m."fullName", m.phone, m."photoUrl",
-             COALESCE(b.billed, 0) - COALESCE(p.paid, 0) + COALESCE(p.refunded, 0)
-               AS "balanceDuePaise"
-      FROM members m
-      LEFT JOIN (
-        SELECT "memberId", SUM("totalPaise")::bigint AS billed
-        FROM memberships
-        GROUP BY "memberId"
-      ) b ON b."memberId" = m.id
-      LEFT JOIN (
-        SELECT "memberId",
-               SUM("amountPaise")::bigint AS paid,
-               SUM("refundedPaise")::bigint AS refunded
-        FROM payments
-        WHERE "deletedAt" IS NULL
-        GROUP BY "memberId"
-      ) p ON p."memberId" = m.id
-      WHERE m."deletedAt" IS NULL
-        AND m.status IN ('ACTIVE', 'EXPIRED')
-        AND COALESCE(b.billed, 0) - COALESCE(p.paid, 0) + COALESCE(p.refunded, 0) > 0
-      ORDER BY "balanceDuePaise" DESC, m."memberId"
+      SELECT id, "memberId", "fullName", phone, "photoUrl",
+             due AS "balanceDuePaise"
+      FROM (${MEMBER_BALANCES}) balances
+      WHERE status IN ('ACTIVE', 'EXPIRED') AND due > 0
+      ORDER BY due DESC, "memberId"
       LIMIT ${limit}
     `;
 

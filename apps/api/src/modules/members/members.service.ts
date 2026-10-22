@@ -45,7 +45,7 @@ import {
   savePhotoFromDataUrl,
 } from '../../services/storage/photo.service.js';
 import { calculateBalance, calculateBill } from '../payments/billing.js';
-import { getDuesSummary } from '../payments/dues.js';
+import { MEMBER_BALANCES, getDuesSummary } from '../payments/dues.js';
 
 const log = moduleLogger('members');
 
@@ -467,30 +467,14 @@ class MembersService {
   }
 
   /**
-   * Members who owe money: billed minus paid plus refunded, above zero —
-   * exactly calculateBalance, so the "Has dues" list always agrees with the
-   * DUE column that attachBalances fills in. One aggregate query rather than
-   * loading every member's memberships and payments into memory.
+   * Members who owe money: a positive balance by the shared definition in
+   * payments/dues.ts — exactly calculateBalance — so the "Has dues" list
+   * agrees with the DUE column attachBalances fills in and adds up to the
+   * dues totals shown elsewhere.
    */
   private async memberIdsWithDues(): Promise<string[]> {
     const rows = await prisma.$queryRaw<Array<{ id: string }>>`
-      SELECT m.id
-      FROM members m
-      LEFT JOIN (
-        SELECT "memberId", SUM("totalPaise")::bigint AS billed
-        FROM memberships
-        GROUP BY "memberId"
-      ) b ON b."memberId" = m.id
-      LEFT JOIN (
-        SELECT "memberId",
-               SUM("amountPaise")::bigint AS paid,
-               SUM("refundedPaise")::bigint AS refunded
-        FROM payments
-        WHERE "deletedAt" IS NULL
-        GROUP BY "memberId"
-      ) p ON p."memberId" = m.id
-      WHERE m."deletedAt" IS NULL
-        AND COALESCE(b.billed, 0) - COALESCE(p.paid, 0) + COALESCE(p.refunded, 0) > 0
+      SELECT id FROM (${MEMBER_BALANCES}) balances WHERE due > 0
     `;
     return rows.map((row) => row.id);
   }
