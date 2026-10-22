@@ -72,19 +72,43 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
  */
 let refreshPromise: Promise<string> | null = null;
 
-async function refreshAccessToken(): Promise<string> {
+/**
+ * Exchange the refresh cookie for a new access token — at most ONE request
+ * in flight per tab, and one at a time across tabs.
+ *
+ * Refresh tokens rotate with reuse detection: the server treats a token
+ * presented after it has already been rotated as stolen, and revokes every
+ * session the user has. Two refreshes racing with the same cookie therefore
+ * look exactly like a theft — the first rotates the token, the second
+ * arrives carrying the old one, and the user is signed out everywhere.
+ *
+ * Within a tab, the shared promise collapses concurrent callers into one
+ * request. Across tabs — a browser restoring several app tabs at startup,
+ * two links opened at once — the Web Locks API queues them, so the second
+ * tab's request is sent only after the first has finished and the cookie
+ * jar holds the new token. The server stays exactly as strict as before.
+ */
+export async function refreshAccessToken(): Promise<string> {
   refreshPromise ??= (async () => {
     try {
-      // Uses the `api` instance, not bare axios: a bare call would bypass the
-      // demo adapter and hit the network.
-      const response = await api.post<{
-        success: boolean;
-        data: { accessToken: string; expiresIn: number };
-      }>('/auth/refresh', {});
+      const run = async (): Promise<string> => {
+        // Uses the `api` instance, not bare axios: a bare call would bypass
+        // the demo adapter and hit the network.
+        const response = await api.post<{
+          success: boolean;
+          data: { accessToken: string; expiresIn: number };
+        }>('/auth/refresh', {});
 
-      const token = response.data.data.accessToken;
-      setAccessToken(token);
-      return token;
+        const token = response.data.data.accessToken;
+        setAccessToken(token);
+        return token;
+      };
+
+      // Every current browser supports Web Locks; without it, fall back to
+      // the per-tab guarantee alone rather than failing.
+      return typeof navigator !== 'undefined' && navigator.locks
+        ? await navigator.locks.request('azf-auth-refresh', run)
+        : await run();
     } finally {
       // Cleared whether it resolved or rejected, so a later failure can retry.
       refreshPromise = null;

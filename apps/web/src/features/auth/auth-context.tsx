@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import * as React from 'react';
 import {
   api,
+  refreshAccessToken,
   setAccessToken,
   setSessionExpiredHandler,
 } from '@/lib/api-client';
@@ -51,12 +52,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     async function restore() {
       try {
-        const refresh = await api.post<{
-          data: { accessToken: string };
-        }>('/auth/refresh');
-
+        // Through the shared refresher, never a direct POST: React StrictMode
+        // runs this effect twice in development, and a second, parallel
+        // refresh with the same cookie trips reuse detection and revokes
+        // every session (see refreshAccessToken). The shared call collapses
+        // both runs into one request, and stores the new access token itself.
+        await refreshAccessToken();
         if (cancelled) return;
-        setAccessToken(refresh.data.data.accessToken);
 
         const me = await api.get<{ data: AuthUser }>('/auth/me');
         if (cancelled) return;
