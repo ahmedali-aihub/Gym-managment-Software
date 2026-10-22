@@ -300,7 +300,7 @@ export function ReportsPage() {
       </div>
 
       {/* Charts */}
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <ReportCard
           className="lg:col-span-2"
           title={`Revenue by ${bucketUnit}`}
@@ -325,7 +325,7 @@ export function ReportsPage() {
         </ReportCard>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <ReportCard
           className="lg:col-span-2"
           title="Net member change"

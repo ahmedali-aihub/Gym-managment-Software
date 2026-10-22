@@ -211,7 +211,7 @@ export function MemberProfilePage() {
         )}
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         {/* ── Identity card ───────────────────────────────────────────── */}
         <motion.div
           initial={{ opacity: 0, y: 8 }}
@@ -422,7 +422,7 @@ export function MemberProfilePage() {
 
           {/* Tabs */}
           <Tabs defaultValue="payments">
-            <TabsList>
+            <TabsList className="max-w-full justify-start overflow-x-auto">
               <TabsTrigger value="payments">
                 <Receipt />
                 Payments
@@ -744,7 +744,7 @@ function ProfileSkeleton() {
   return (
     <div className="space-y-6">
       <Skeleton className="h-8 w-48" />
-      <div className="grid gap-5 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <Card className="p-6">
           <div className="flex flex-col items-center gap-3">
             <Skeleton className="size-20 rounded-full" />

@@ -102,6 +102,18 @@ export interface RevenuePoint {
   collectedPaise: number;
 }
 
+/**
+ * Print every Nth x-axis label once there are more points than fit.
+ *
+ * A month bucketed by day is 31 labels like "12 Oct". Side by side they need
+ * more room than a phone has, and as un-shrinkable flex items they stretched
+ * the whole card past the screen edge. Every slot still renders (so labels
+ * stay under their bars), but only about eight carry text.
+ */
+function labelStepFor(count: number): number {
+  return count > 12 ? Math.ceil(count / 8) : 1;
+}
+
 export function RevenueTrendChart({ data }: { data: RevenuePoint[] }) {
   const { state, setState, clear } = useTooltip();
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -286,9 +298,9 @@ export function RevenueTrendChart({ data }: { data: RevenuePoint[] }) {
             {data.map((point, index) => (
               <span
                 key={index}
-                className="flex-1 pt-2 text-center text-[10px] text-muted-foreground"
+                className="flex min-w-0 flex-1 justify-center whitespace-nowrap pt-2 text-[10px] text-muted-foreground"
               >
-                {point.month}
+                {index % labelStepFor(data.length) === 0 ? point.month : ''}
               </span>
             ))}
           </div>
@@ -445,9 +457,9 @@ export function MemberGrowthChart({ data }: { data: GrowthPoint[] }) {
             {rows.map((row, index) => (
               <span
                 key={index}
-                className="flex-1 pt-2 text-center text-[10px] text-muted-foreground"
+                className="flex min-w-0 flex-1 justify-center whitespace-nowrap pt-2 text-[10px] text-muted-foreground"
               >
-                {row.month}
+                {index % labelStepFor(rows.length) === 0 ? row.month : ''}
               </span>
             ))}
           </div>

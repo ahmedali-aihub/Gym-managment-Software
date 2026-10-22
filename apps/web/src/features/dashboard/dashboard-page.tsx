@@ -210,7 +210,7 @@ export function DashboardPage() {
       />
 
       {/* Today's collection alongside the member-status KPIs */}
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <TodayCollectionCard />
 
         <div className="grid content-start gap-4 sm:grid-cols-2 lg:col-span-2">
@@ -268,7 +268,7 @@ export function DashboardPage() {
         <AccentSwitcher />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <ChartCard
           className="lg:col-span-2"
           title={`Revenue — ${periodLabel(period, range)}`}
@@ -295,7 +295,7 @@ export function DashboardPage() {
         </ChartCard>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <ChartCard
           className="lg:col-span-2"
           title="Net member change"
@@ -331,7 +331,7 @@ export function DashboardPage() {
       </ChartCard>
 
       {/* ── Widgets ─────────────────────────────────────────────────── */}
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <ExpiringWidget
           items={data?.expiring}
           loading={isLoading}
