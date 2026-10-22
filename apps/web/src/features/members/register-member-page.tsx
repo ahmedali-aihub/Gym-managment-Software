@@ -187,15 +187,16 @@ export function RegisterMemberPage() {
   const mutation = useMutation({
     mutationFn: async (values: RegisterForm) => {
       const response = await api.post<{
-        data: { member: { id: string; memberId: string } };
+        data: { member: { id: string; memberId: string; email: string | null } };
       }>('/members', {
         fullName: values.fullName,
         phone: values.phone,
         email: values.email || undefined,
-        // The API requires a DOB; default to a placeholder adult date when
-        // the desk skipped it, and let staff correct it from the profile.
-        dateOfBirth: values.dateOfBirth || '1995-01-01',
-        gender: values.gender || Gender.MALE,
+        // Both optional. Left blank, the API records them as "not recorded"
+        // instead of this form inventing a plausible-looking birthday and
+        // gender; staff can fill them in later from the profile.
+        dateOfBirth: values.dateOfBirth || undefined,
+        gender: values.gender || undefined,
         photoDataUrl: photo ?? undefined,
         address: values.addressLine1
           ? {
@@ -237,8 +238,12 @@ export function RegisterMemberPage() {
       void queryClient.invalidateQueries({ queryKey: ['analytics'] });
       void queryClient.invalidateQueries({ queryKey: ['today-collection'] });
 
+      // What actually goes out — see the "will automatically receive" list.
+      // SMS is not offered on this form, so it must not be promised here.
       toast.success(`${data.member.memberId} registered`, {
-        description: 'Welcome SMS queued.',
+        description: data.member.email
+          ? 'Welcome WhatsApp and receipt email are on their way.'
+          : 'Welcome WhatsApp is on its way.',
       });
 
       navigate(`/members/${data.member.id}`);
