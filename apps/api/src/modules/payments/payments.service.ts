@@ -20,6 +20,7 @@ import type { Payment, Prisma } from '@prisma/client';
 import { issueReceipt } from '../invoices/receipt-issuer.js';
 import { emailService } from '../../services/email/email.service.js';
 import { whatsappService } from '../../services/whatsapp/whatsapp.service.js';
+import { runInBackground } from '../../lib/background.js';
 import {
   InvalidStateError,
   NotFoundError,
@@ -148,18 +149,24 @@ class PaymentsService {
     );
 
     if (input.sendSms) {
-      void this.sendReceiptSms(member.id, member.phone, member.memberId, payment, balance);
+      runInBackground(
+        this.sendReceiptSms(member.id, member.phone, member.memberId, payment, balance),
+        'receipt SMS',
+      );
     }
 
     // WhatsApp confirmation — the channel most members read. Always sent,
     // because every member has a mobile number.
-    void this.sendReceiptWhatsApp(
-      member.id,
-      member.phone,
-      member.fullName,
-      member.memberId,
-      payment,
-      balance,
+    runInBackground(
+      this.sendReceiptWhatsApp(
+        member.id,
+        member.phone,
+        member.fullName,
+        member.memberId,
+        payment,
+        balance,
+      ),
+      'receipt WhatsApp',
     );
 
     // The receipt PDF, emailed to the member. Sent whenever they gave an
@@ -167,13 +174,16 @@ class PaymentsService {
     // DLT approval, and a member who has paid should not have to ask for
     // proof of it.
     if (member.email) {
-      void this.sendReceiptEmail(
-        member.id,
-        member.email,
-        member.fullName,
-        member.memberId,
-        payment,
-        balance,
+      runInBackground(
+        this.sendReceiptEmail(
+          member.id,
+          member.email,
+          member.fullName,
+          member.memberId,
+          payment,
+          balance,
+        ),
+        'receipt email',
       );
     }
 

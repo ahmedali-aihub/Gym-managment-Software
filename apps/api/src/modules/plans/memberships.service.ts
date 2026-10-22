@@ -18,6 +18,7 @@ import {
 } from '@azf/shared';
 import type { Membership, Prisma } from '@prisma/client';
 import { gymConfig } from '../../config/env.js';
+import { runInBackground } from '../../lib/background.js';
 import {
   InvalidStateError,
   NotFoundError,
@@ -587,27 +588,30 @@ class MembershipsService {
     );
 
     if (input.sendSms) {
-      void smsService
-        .send({
-          to: member.phone,
-          templateKey: SmsTemplateKey.WELCOME,
-          memberId: member.id,
-          sentById: actorId ?? undefined,
-          variables: {
-            name: member.fullName.split(' ')[0] ?? member.fullName,
-            memberId: member.memberId,
-            plan: plan.name,
-            startDate: formatDate(startDate),
-            expiryDate: formatDate(endDate),
-            amount: paiseToRupees(input.payment.amountPaid).toLocaleString(
-              'en-IN',
-            ),
-            gymPhone: gymConfig.phone,
-          },
-        })
-        .catch((error: unknown) => {
-          log.error({ err: error }, 'Renewal SMS failed');
-        });
+      runInBackground(
+        smsService
+          .send({
+            to: member.phone,
+            templateKey: SmsTemplateKey.WELCOME,
+            memberId: member.id,
+            sentById: actorId ?? undefined,
+            variables: {
+              name: member.fullName.split(' ')[0] ?? member.fullName,
+              memberId: member.memberId,
+              plan: plan.name,
+              startDate: formatDate(startDate),
+              expiryDate: formatDate(endDate),
+              amount: paiseToRupees(input.payment.amountPaid).toLocaleString(
+                'en-IN',
+              ),
+              gymPhone: gymConfig.phone,
+            },
+          })
+          .catch((error: unknown) => {
+            log.error({ err: error }, 'Renewal SMS failed');
+          }),
+        'renewal SMS',
+      );
     }
 
     return created;

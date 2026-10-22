@@ -19,6 +19,7 @@ import {
 } from '@azf/shared';
 import type { Member, Prisma } from '@prisma/client';
 import { gymConfig } from '../../config/env.js';
+import { runInBackground } from '../../lib/background.js';
 import { InvalidStateError, NotFoundError } from '../../lib/errors.js';
 import { moduleLogger } from '../../lib/logger.js';
 import {
@@ -252,17 +253,20 @@ class MembersService {
       // member today and cost nothing. The path stays for gyms that have
       // completed DLT.
       if (input.sendWelcomeSms) {
-        void this.sendWelcomeSms({
-          memberDbId: result.member.id,
-          memberId: result.member.memberId,
-          fullName: result.member.fullName,
-          phone: result.member.phone,
-          planName: plan.name,
-          startDate: result.membership.startDate,
-          endDate: result.membership.endDate,
-          amountPaidPaise: input.payment.amountPaid,
-          sentById: createdById,
-        });
+        runInBackground(
+          this.sendWelcomeSms({
+            memberDbId: result.member.id,
+            memberId: result.member.memberId,
+            fullName: result.member.fullName,
+            phone: result.member.phone,
+            planName: plan.name,
+            startDate: result.membership.startDate,
+            endDate: result.membership.endDate,
+            amountPaidPaise: input.payment.amountPaid,
+            sentById: createdById,
+          }),
+          'welcome SMS',
+        );
       }
 
       // Welcome email — sent whenever the member gave an address, with no
@@ -270,30 +274,36 @@ class MembersService {
       // DLT approval, so there is no reason to make the desk decide.
       // WhatsApp — the channel most members actually read. Sent whenever we
       // have a mobile number, which is every member: phone is required.
-      void this.sendWelcomeWhatsApp({
-        memberDbId: result.member.id,
-        memberId: result.member.memberId,
-        fullName: result.member.fullName,
-        phone: result.member.phone,
-        planName: plan.name,
-        endDate: result.membership.endDate,
-        amountPaidPaise: input.payment.amountPaid,
-        sentById: createdById,
-      });
-
-      if (result.member.email) {
-        void this.sendWelcomeEmail({
+      runInBackground(
+        this.sendWelcomeWhatsApp({
           memberDbId: result.member.id,
           memberId: result.member.memberId,
           fullName: result.member.fullName,
-          email: result.member.email,
+          phone: result.member.phone,
           planName: plan.name,
-          startDate: result.membership.startDate,
           endDate: result.membership.endDate,
           amountPaidPaise: input.payment.amountPaid,
-          invoiceId: result.invoiceId,
           sentById: createdById,
-        });
+        }),
+        'welcome WhatsApp',
+      );
+
+      if (result.member.email) {
+        runInBackground(
+          this.sendWelcomeEmail({
+            memberDbId: result.member.id,
+            memberId: result.member.memberId,
+            fullName: result.member.fullName,
+            email: result.member.email,
+            planName: plan.name,
+            startDate: result.membership.startDate,
+            endDate: result.membership.endDate,
+            amountPaidPaise: input.payment.amountPaid,
+            invoiceId: result.invoiceId,
+            sentById: createdById,
+          }),
+          'welcome email',
+        );
       }
 
       return { member: result.member, qrDataUrl };

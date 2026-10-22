@@ -8,6 +8,7 @@ import {
 import type { Prisma } from '@prisma/client';
 import type { Request, Response } from 'express';
 import { gymConfig } from '../../config/env.js';
+import { runInBackground } from '../../lib/background.js';
 import { NotFoundError } from '../../lib/errors.js';
 import {
   buildPaginatedResponse,
@@ -127,7 +128,10 @@ export const smsController = {
     );
 
     // Kick the queue without blocking the response.
-    void smsService.processRetryQueue(queued.length);
+    runInBackground(
+      smsService.processRetryQueue(queued.length),
+      'bulk SMS queue',
+    );
 
     res.status(202).json({
       success: true,
