@@ -7,6 +7,7 @@ import {
   formatINR,
   formatPhone,
   calculateAge,
+  isDobRecorded,
   relativeExpiry,
   daysUntil,
   type MemberStatus,
@@ -244,7 +245,11 @@ export function MemberProfilePage() {
                 )}
 
                 <InfoRow icon={User} label="Age">
-                  {calculateAge(data.dateOfBirth)} years
+                  {isDobRecorded(data.dateOfBirth) ? (
+                    `${calculateAge(data.dateOfBirth)} years`
+                  ) : (
+                    <span className="text-muted-foreground">Not recorded</span>
+                  )}
                 </InfoRow>
 
                 <InfoRow icon={CalendarDays} label="Joined">
