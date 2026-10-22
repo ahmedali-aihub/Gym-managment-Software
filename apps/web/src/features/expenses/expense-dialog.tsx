@@ -1,4 +1,4 @@
-import { paiseToRupees, rupeesToPaise } from '@azf/shared';
+import { paiseToRupees, rupeesToPaise, toDateInputValue } from '@azf/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { IndianRupee, Save, Trash2 } from 'lucide-react';
 import * as React from 'react';
@@ -79,8 +79,8 @@ export function ExpenseDialog({
       title: expense?.title ?? '',
       amountRupees: expense ? String(paiseToRupees(expense.amountPaise)) : '',
       incurredAt: expense
-        ? expense.incurredAt.slice(0, 10)
-        : new Date().toISOString().slice(0, 10),
+        ? toDateInputValue(expense.incurredAt)
+        : toDateInputValue(new Date()),
       paymentMode:
         (expense?.paymentMode as ExpenseForm['paymentMode']) ?? 'CASH',
       paidTo: expense?.paidTo ?? '',

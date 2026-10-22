@@ -7,6 +7,7 @@ import {
   formatDate,
   formatINR,
   rupeesToPaise,
+  toDateInputValue,
   type FitnessGoal,
 } from '@azf/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -122,7 +123,7 @@ export function RegisterMemberPage() {
       emergencyPhone: '',
       emergencyRelation: '',
       medicalNotes: '',
-      startDate: new Date().toISOString().slice(0, 10),
+      startDate: toDateInputValue(new Date()),
       discountRupees: '',
       discountReason: '',
     },
@@ -571,7 +572,7 @@ export function RegisterMemberPage() {
                     <Field label="Date of birth">
                       <Input
                         type="date"
-                        max={new Date().toISOString().slice(0, 10)}
+                        max={toDateInputValue(new Date())}
                         {...register('dateOfBirth')}
                       />
                     </Field>

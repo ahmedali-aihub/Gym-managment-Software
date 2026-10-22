@@ -3,6 +3,7 @@ import {
   formatDate,
   formatINR,
   rupeesToPaise,
+  toDateInputValue,
 } from '@azf/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, IndianRupee, RefreshCw, Sun } from 'lucide-react';
@@ -368,11 +369,11 @@ export function UnfreezeDialog({
 }) {
   const queryClient = useQueryClient();
   const [resumeDate, setResumeDate] = React.useState(
-    new Date().toISOString().slice(0, 10),
+    toDateInputValue(new Date()),
   );
 
   React.useEffect(() => {
-    if (open) setResumeDate(new Date().toISOString().slice(0, 10));
+    if (open) setResumeDate(toDateInputValue(new Date()));
   }, [open]);
 
   const frozenDays = freezeStartDate
@@ -427,7 +428,7 @@ export function UnfreezeDialog({
               value={resumeDate}
               onChange={(event) => setResumeDate(event.target.value)}
               {...(freezeStartDate
-                ? { min: freezeStartDate.slice(0, 10) }
+                ? { min: toDateInputValue(freezeStartDate) }
                 : {})}
             />
           </div>

@@ -4,6 +4,7 @@ import {
   formatDateTime,
   formatINR,
   formatINRCompact,
+  toDateInputValue,
   type PaymentMode,
 } from '@azf/shared';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
@@ -193,7 +194,7 @@ export function PaymentsPage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `azf-payments-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `azf-payments-${toDateInputValue(new Date())}.csv`;
     link.click();
     URL.revokeObjectURL(url);
 

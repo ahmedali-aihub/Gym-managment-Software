@@ -1,4 +1,4 @@
-import { formatDate } from '@azf/shared';
+import { formatDate, toDateInputValue } from '@azf/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Snowflake } from 'lucide-react';
 import * as React from 'react';
@@ -65,7 +65,7 @@ export function FreezeDialog({
     formState: { errors },
   } = useForm<FreezeForm>({
     defaultValues: {
-      startDate: new Date().toISOString().slice(0, 10),
+      startDate: toDateInputValue(new Date()),
       endDate: '',
       reason: '',
     },
@@ -74,7 +74,7 @@ export function FreezeDialog({
   React.useEffect(() => {
     if (open) {
       reset({
-        startDate: new Date().toISOString().slice(0, 10),
+        startDate: toDateInputValue(new Date()),
         endDate: '',
         reason: '',
       });
