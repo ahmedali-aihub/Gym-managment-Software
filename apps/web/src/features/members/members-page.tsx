@@ -99,7 +99,7 @@ export function MembersPage() {
   const navigate = useNavigate();
 
   const page = Number(searchParams.get('page')) || 1;
-  const status = searchParams.get('status') ?? '';
+  const statusParam = searchParams.get('status');
   const expiringInDays = searchParams.get('expiringInDays') ?? '';
   const hasDues = searchParams.get('hasDues') ?? '';
   const urlSearch = searchParams.get('search') ?? '';
@@ -119,6 +119,22 @@ export function MembersPage() {
   // 'expiring' answers "who do I need to chase?".
   const dateMode =
     searchParams.get('dateMode') === 'expiring' ? 'expiring' : 'joined';
+  // Members opens on ACTIVE members, not everyone. After the import from
+  // the old software most of the 5,000+ records are long-expired, so an
+  // unfiltered default buried the people actually training today.
+  //
+  // The default applies only when nothing else narrows the list. A search
+  // looks through everyone — a phone lookup for a member whose plan lapsed
+  // must still find them — and the dashboard's "has dues" / "expiring"
+  // links keep meaning exactly what they say. `status=all` in the URL is
+  // the explicit "show everyone" the Total chip sets.
+  const hasOtherFilter = Boolean(
+    expiringInDays || hasDues || urlSearch || goalsParam || (dateFrom && dateTo),
+  );
+  const status =
+    statusParam === 'all'
+      ? ''
+      : (statusParam ?? (hasOtherFilter ? '' : 'ACTIVE'));
   const selectedGoals = goalsParam
     ? (goalsParam.split(',').filter(Boolean) as FitnessGoal[])
     : [];
@@ -155,6 +171,9 @@ export function MembersPage() {
     setSearchParams((current) => {
       const next = new URLSearchParams(current);
       if (value) next.set(key, value);
+      // Removing the status filter means "everyone", not "back to the
+      // Active default" — toggling Expired off should not land on Active.
+      else if (key === 'status') next.set('status', 'all');
       else next.delete(key);
       next.delete('page');
       return next;
@@ -184,7 +203,8 @@ export function MembersPage() {
   }
 
   const activeFilterCount = [
-    status,
+    // The Active default is not something the user applied.
+    statusParam && statusParam !== 'all' ? statusParam : '',
     expiringInDays,
     hasDues,
     goalsParam,
@@ -294,8 +314,11 @@ export function MembersPage() {
         <StatChip
           label="Total"
           value={stats?.total}
-          active={!status && !expiringInDays && !hasDues}
-          onClick={clearFilters}
+          active={!status && !hasOtherFilter}
+          onClick={() => {
+            setSearchParams(new URLSearchParams({ status: 'all' }));
+            setSearchInput('');
+          }}
         />
         <StatChip
           label="Active"
