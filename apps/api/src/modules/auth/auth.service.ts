@@ -249,6 +249,10 @@ class AuthService {
         passwordHash: await hashPassword(input.password),
         role: input.role,
         isActive: input.isActive,
+        // Whoever created the account knows this password, so it is only
+        // good for the first sign-in; the server blocks everything else until
+        // the new user sets their own.
+        mustChangePassword: true,
       },
     });
 
