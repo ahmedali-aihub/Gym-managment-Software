@@ -25,6 +25,7 @@ import {
   CreditCard,
   Mail,
   MapPin,
+  Pencil,
   Send,
   Phone,
   History,
@@ -53,6 +54,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { RecordPaymentDialog } from '@/features/payments/record-payment-dialog';
 import { api, getErrorMessage } from '@/lib/api-client';
+import { EditMemberDialog } from './edit-member-dialog';
 import { FreezeDialog } from './member-dialogs';
 import { NotifyDialog } from './notify-dialog';
 import { RenewDialog, UnfreezeDialog } from './renew-dialog';
@@ -148,6 +150,10 @@ export function MemberProfilePage() {
 
   // Mirrors the API, which refuses /history to other roles.
   const canSeeHistory = hasRole(Role.OWNER, Role.MANAGER);
+  // And PATCH /members/:id, which trainers cannot call.
+  const canEdit = hasRole(Role.OWNER, Role.MANAGER, Role.RECEPTIONIST);
+
+  const [editOpen, setEditOpen] = React.useState(false);
 
   const [paymentOpen, setPaymentOpen] = React.useState(false);
   const [freezeOpen, setFreezeOpen] = React.useState(false);
@@ -191,6 +197,18 @@ export function MemberProfilePage() {
         <h1 className="font-display text-xl font-semibold tracking-tight">
           Member profile
         </h1>
+
+        {canEdit && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="ml-auto"
+            onClick={() => setEditOpen(true)}
+          >
+            <Pencil />
+            Edit details
+          </Button>
+        )}
       </div>
 
       <div className="grid gap-5 lg:grid-cols-3">
@@ -631,6 +649,12 @@ export function MemberProfilePage() {
         member={data}
         expiryDate={currentMembership?.endDate ?? null}
         balanceDuePaise={data.balance.balanceDuePaise}
+      />
+
+      <EditMemberDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        member={data}
       />
 
       <FreezeDialog
