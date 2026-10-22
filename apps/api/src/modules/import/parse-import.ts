@@ -220,16 +220,6 @@ function parseGender(value: string | undefined): Gender | null {
   return null;
 }
 
-/**
- * A placeholder date of birth for records the old system never captured.
- *
- * 1 January 1900 is deliberately absurd: it can never be mistaken for a real
- * birth date, it sorts to the top of any "check these" list, and it keeps
- * the member out of birthday reminders. A plausible fake date would quietly
- * become permanent.
- */
-export const PLACEHOLDER_DOB = new Date(1900, 0, 1);
-
 export function parseRow(
   row: RawRow,
   mapping: Record<string, string>,

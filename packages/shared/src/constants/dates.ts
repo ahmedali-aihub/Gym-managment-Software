@@ -148,6 +148,26 @@ export function calculateAge(dob: Date | string): number {
   return age;
 }
 
+/**
+ * Stored when a member's date of birth was never captured — the column is
+ * NOT NULL. 1 January 1900 is deliberately absurd: it can never be mistaken
+ * for a real birth date, sorts to the top of any "check these" list, and
+ * keeps the member out of birthday reminders. A plausible fake date would
+ * quietly become permanent.
+ */
+export const PLACEHOLDER_DOB = new Date(1900, 0, 1);
+
+/**
+ * False for PLACEHOLDER_DOB, so a profile shows "Not recorded" rather than
+ * an age of 126. Compares the year, not the instant: placeholders written
+ * from machines in different timezones are a few hours apart.
+ */
+export function isDobRecorded(dob: Date | string | null | undefined): boolean {
+  if (!dob) return false;
+  const d = typeof dob === 'string' ? new Date(dob) : dob;
+  return !Number.isNaN(d.getTime()) && d.getFullYear() > 1900;
+}
+
 /** True when the date's day+month match today, ignoring year. */
 export function isBirthdayToday(dob: Date | string): boolean {
   const birth = typeof dob === 'string' ? new Date(dob) : dob;

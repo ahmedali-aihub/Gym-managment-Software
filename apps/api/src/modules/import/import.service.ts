@@ -1,4 +1,8 @@
-import { MemberStatus, MembershipStatus } from '@azf/shared';
+import {
+  MemberStatus,
+  MembershipStatus,
+  PLACEHOLDER_DOB,
+} from '@azf/shared';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
 import { moduleLogger } from '../../lib/logger.js';
@@ -7,10 +11,7 @@ import {
   type AuditActor,
   auditService,
 } from '../../services/audit/audit.service.js';
-import {
-  PLACEHOLDER_DOB,
-  type ParsedMember,
-} from './parse-import.js';
+import type { ParsedMember } from './parse-import.js';
 
 const log = moduleLogger('import');
 

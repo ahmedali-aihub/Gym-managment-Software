@@ -7,8 +7,10 @@ import type {
 } from '@azf/shared';
 import {
   EmailTemplateKey,
+  Gender,
   MemberStatus,
   MembershipStatus,
+  PLACEHOLDER_DOB,
   PaymentStatus,
   SmsTemplateKey,
   WhatsAppTemplateKey,
@@ -128,8 +130,8 @@ class MembersService {
             fullName: input.fullName,
             phone: input.phone,
             email: input.email ?? null,
-            dateOfBirth: input.dateOfBirth,
-            gender: input.gender,
+            dateOfBirth: input.dateOfBirth ?? PLACEHOLDER_DOB,
+            gender: input.gender ?? Gender.OTHER,
             photoUrl,
             addressLine1: input.address?.line1 ?? null,
             addressLine2: input.address?.line2 ?? null,

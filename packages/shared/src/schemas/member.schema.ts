@@ -49,8 +49,12 @@ export const createMemberSchema = z.object({
   fullName: nameSchema,
   phone: phoneSchema,
   email: optionalEmailSchema,
-  dateOfBirth: dobSchema,
-  gender: z.nativeEnum(Gender),
+  // Optional: the desk often registers someone mid-queue without asking.
+  // Left out, they are stored as PLACEHOLDER_DOB and OTHER — the same
+  // "not recorded" values the importer uses — rather than a guess that
+  // would read as real data later.
+  dateOfBirth: dobSchema.optional(),
+  gender: z.nativeEnum(Gender).optional(),
 
   /**
    * Base64 data URL from the webcam capture, or an uploaded file.
