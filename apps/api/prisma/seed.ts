@@ -19,9 +19,56 @@ import {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 loadDotenv({ path: path.resolve(__dirname, '../../../.env') });
 
-const adapter = new PrismaPg({
-  connectionString: process.env.DIRECT_URL ?? process.env.DATABASE_URL ?? '',
-});
+const connectionString = process.env.DIRECT_URL ?? process.env.DATABASE_URL ?? '';
+
+/**
+ * Refuse to wipe a database that is not on this machine.
+ *
+ * This seed starts by deleting EVERY member, payment, invoice, plan and
+ * staff login, and by default it targets whatever .env points at — which,
+ * since the October 2026 import, is production holding the gym's real
+ * 5,000+ members and their payment history. One habitual `npm run db:seed`
+ * would erase all of it, owner login included.
+ *
+ * A local database (localhost / 127.0.0.1) seeds freely. Anything else must
+ * be named explicitly: SEED_REMOTE_HOST has to equal the exact host about to
+ * be wiped, so the only way through is typing it — never by accident.
+ */
+function assertSafeTarget(url: string): void {
+  let host: string;
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    throw new Error('Seed refused: DATABASE_URL / DIRECT_URL is missing or malformed.');
+  }
+
+  const isLocal = ['localhost', '127.0.0.1', '::1', '[::1]'].includes(host);
+  if (isLocal) return;
+
+  if (process.env.SEED_REMOTE_HOST === host) {
+    console.warn(
+      `\n⚠  Seeding REMOTE database at ${host} — all existing data will be deleted.\n`,
+    );
+    return;
+  }
+
+  console.error(
+    [
+      '',
+      `Seed refused: the target database is ${host}, not this machine.`,
+      'This script deletes every member, payment, invoice, plan and staff login',
+      'before inserting demo data. If you really mean to wipe that database, run:',
+      '',
+      `  SEED_REMOTE_HOST=${host} npm run db:seed`,
+      '',
+    ].join('\n'),
+  );
+  process.exit(1);
+}
+
+assertSafeTarget(connectionString);
+
+const adapter = new PrismaPg({ connectionString });
 const prisma = new PrismaClient({ adapter });
 
 /**
