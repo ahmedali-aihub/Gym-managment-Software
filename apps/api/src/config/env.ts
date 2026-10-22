@@ -139,7 +139,10 @@ const envSchema = z
     WHATSAPP_RETRY_BACKOFF_MS: z.coerce.number().int().min(1000).default(60_000),
     /// BCP-47 code of the APPROVED template, not the member's language.
     WHATSAPP_LANGUAGE: z.string().default('en'),
-    WHATSAPP_API_VERSION: z.string().default('v21.0'),
+    /// Meta retires each Graph API version about two years after release:
+    /// v21.0 stops working on 21 Jan 2027, v25.0 is supported until 29 Jul
+    /// 2028 (developers.facebook.com/docs/graph-api/changelog/versions).
+    WHATSAPP_API_VERSION: z.string().default('v25.0'),
     /// From Meta: WhatsApp Manager -> API Setup.
     WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
     WHATSAPP_ACCESS_TOKEN: z.string().optional(),
