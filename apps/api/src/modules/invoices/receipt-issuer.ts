@@ -5,11 +5,12 @@ import { nextDocumentNumber } from '../../lib/sequences.js';
 /**
  * Issue the receipt document for a payment.
  *
- * SHARED BY BOTH PAYMENT PATHS. Registration and the payments screen each
- * take money, and both must produce a document from the same gap-free
- * sequence. This used to live privately inside the payments service, so a
- * registration payment got no receipt at all — the member paid ₹4,000 and
- * had nothing to show for it, and the welcome email had no PDF to attach.
+ * SHARED BY EVERY PAYMENT PATH. Registration, renewal and the payments
+ * screen each take money, and all must produce a document from the same
+ * gap-free sequence. This used to live privately inside the payments
+ * service, so a registration payment got no receipt at all — the member
+ * paid ₹4,000 and had nothing to show for it, and the welcome email had no
+ * PDF to attach. Renewals had the same gap until they called this too.
  *
  * Runs INSIDE the caller's transaction. The document number comes from a
  * row-locked sequence, so issuing it outside the transaction that creates

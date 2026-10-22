@@ -26,6 +26,7 @@ import {
 import { moduleLogger } from '../../lib/logger.js';
 import { prisma, TRANSACTION_OPTIONS } from '../../lib/prisma.js';
 import { smsService } from '../../services/sms/sms.service.js';
+import { issueReceipt } from '../invoices/receipt-issuer.js';
 import {
   calculateBill,
   calculateProratedCredit,
@@ -542,7 +543,7 @@ class MembershipsService {
       });
 
       if (input.payment.amountPaid > 0) {
-        await tx.payment.create({
+        const payment = await tx.payment.create({
           data: {
             memberId: input.memberId,
             membershipId: membership.id,
@@ -557,6 +558,11 @@ class MembershipsService {
             collectedById: actorId,
           },
         });
+
+        // Inside the transaction, like the other payment paths: the receipt
+        // number comes from a row-locked sequence, so a renewal that rolls
+        // back must not have consumed one.
+        await issueReceipt(tx, payment.id, input.memberId, membership.id);
       }
 
       await tx.membershipEvent.create({
