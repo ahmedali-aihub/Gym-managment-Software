@@ -419,6 +419,19 @@ class MembersService {
     const { skip, take } = getSkipTake(params);
     const where = this.buildWhere(params);
 
+    // "Has dues" is computed, not stored, so it cannot live in buildWhere.
+    // The schema accepted hasDues and the members page sent it, but nothing
+    // ever applied it — the "Has dues" chip and the dashboard's outstanding-
+    // dues link both listed every member. Added to AND so it combines with
+    // the status, plan and date filters rather than replacing them.
+    if (params.hasDues !== undefined) {
+      const withDues = await this.memberIdsWithDues();
+      where.AND = [
+        ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+        params.hasDues ? { id: { in: withDues } } : { id: { notIn: withDues } },
+      ];
+    }
+
     const [data, total] = await Promise.all([
       prisma.member.findMany({
         where,
@@ -438,6 +451,35 @@ class MembersService {
     const withBalances = await this.attachBalances(data);
 
     return buildPaginatedResponse(withBalances, total, params);
+  }
+
+  /**
+   * Members who owe money: billed minus paid plus refunded, above zero —
+   * exactly calculateBalance, so the "Has dues" list always agrees with the
+   * DUE column that attachBalances fills in. One aggregate query rather than
+   * loading every member's memberships and payments into memory.
+   */
+  private async memberIdsWithDues(): Promise<string[]> {
+    const rows = await prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT m.id
+      FROM members m
+      LEFT JOIN (
+        SELECT "memberId", SUM("totalPaise")::bigint AS billed
+        FROM memberships
+        GROUP BY "memberId"
+      ) b ON b."memberId" = m.id
+      LEFT JOIN (
+        SELECT "memberId",
+               SUM("amountPaise")::bigint AS paid,
+               SUM("refundedPaise")::bigint AS refunded
+        FROM payments
+        WHERE "deletedAt" IS NULL
+        GROUP BY "memberId"
+      ) p ON p."memberId" = m.id
+      WHERE m."deletedAt" IS NULL
+        AND COALESCE(b.billed, 0) - COALESCE(p.paid, 0) + COALESCE(p.refunded, 0) > 0
+    `;
+    return rows.map((row) => row.id);
   }
 
   private buildWhere(params: MemberQuery): Prisma.MemberWhereInput {
