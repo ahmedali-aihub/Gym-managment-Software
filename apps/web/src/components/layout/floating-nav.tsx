@@ -5,24 +5,32 @@ import {
   motion,
   useMotionValue,
 } from 'framer-motion';
+// Phosphor glyphs rather than lucide for the navigation chrome. Lucide's
+// defaults (LayoutDashboard, Users, CreditCard…) are the icon set nearly
+// every generated admin template ships with, and they read that way.
+// Phosphor's softer geometry suits the rounded titanium pill, and its `fill`
+// weight gives the active tab a proper solid state — outlined at rest,
+// filled when selected, the way iOS tab bars signal "you are here".
+// Bundled locally with only the two weights used; see nav-icons.tsx.
 import {
-  BarChart3,
-  ChevronDown,
-  CreditCard,
-  Dumbbell,
-  LayoutDashboard,
-  LogOut,
-  ScanLine,
-  Wallet,
-  MessageSquare,
-  Monitor,
+  Barbell,
+  CaretDown,
+  ChartLineUp,
+  ChatCircleDots,
+  Desktop,
+  Gear,
+  MagnifyingGlass,
   Moon,
-  Search,
-  Settings,
+  QrCode,
+  Receipt,
+  SignOut,
+  SquaresFour,
   Sun,
   UserPlus,
-  Users,
-} from 'lucide-react';
+  UsersThree,
+  Wallet,
+  type NavIcon,
+} from '@/components/icons/nav-icons';
 import * as React from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -42,32 +50,34 @@ import { cn } from '@/lib/utils';
 interface NavItem {
   to: string;
   label: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: NavIcon;
   roles?: Role[];
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/members', label: 'Members', icon: Users },
-  { to: '/check-in', label: 'Check-in', icon: ScanLine },
-  { to: '/payments', label: 'Payments', icon: CreditCard },
-  { to: '/messages', label: 'Messages', icon: MessageSquare },
+  { to: '/dashboard', label: 'Dashboard', icon: SquaresFour },
+  { to: '/members', label: 'Members', icon: UsersThree },
+  // Check-in IS a QR scan at the desk.
+  { to: '/check-in', label: 'Check-in', icon: QrCode },
+  // Money in (mostly cash and UPI, rarely cards) vs money out (bills).
+  { to: '/payments', label: 'Payments', icon: Wallet },
+  { to: '/messages', label: 'Messages', icon: ChatCircleDots },
   {
     to: '/plans',
     label: 'Plans',
-    icon: Dumbbell,
+    icon: Barbell,
     roles: [Role.OWNER, Role.MANAGER],
   },
   {
     to: '/expenses',
     label: 'Expenses',
-    icon: Wallet,
+    icon: Receipt,
     roles: [Role.OWNER, Role.MANAGER],
   },
   {
     to: '/reports',
     label: 'Reports',
-    icon: BarChart3,
+    icon: ChartLineUp,
     roles: [Role.OWNER, Role.MANAGER],
   },
 ];
@@ -180,7 +190,7 @@ export function FloatingNav() {
           aria-label="Search (Ctrl+K)"
           title="Search  ⌘K"
         >
-          <Search className="size-[17px]" />
+          <MagnifyingGlass className="size-[17px]" />
         </button>
 
         {/* New member */}
@@ -211,7 +221,7 @@ export function FloatingNav() {
               <span className="flex size-8 items-center justify-center rounded-full bg-secondary text-[12px] font-semibold text-secondary-foreground">
                 {user?.fullName.charAt(0).toUpperCase()}
               </span>
-              <ChevronDown className="mr-0.5 hidden size-3 text-muted-foreground sm:block" />
+              <CaretDown className="mr-0.5 hidden size-3 text-muted-foreground sm:block" />
             </button>
           </DropdownMenuTrigger>
 
@@ -243,7 +253,7 @@ export function FloatingNav() {
                 Dark
               </DropdownMenuRadioItem>
               <DropdownMenuRadioItem value="system">
-                <Monitor className="mr-2 size-4" />
+                <Desktop className="mr-2 size-4" />
                 System
                 <span className="ml-auto text-[10px] capitalize text-muted-foreground">
                   {resolvedTheme}
@@ -255,7 +265,7 @@ export function FloatingNav() {
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onSelect={() => navigate('/settings')}>
-                  <Settings />
+                  <Gear />
                   Settings
                 </DropdownMenuItem>
               </>
@@ -264,7 +274,7 @@ export function FloatingNav() {
             <DropdownMenuSeparator />
 
             <DropdownMenuItem destructive onSelect={() => void logout()}>
-              <LogOut />
+              <SignOut />
               Sign out
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -594,7 +604,12 @@ const NavPill = React.forwardRef<
         targeted && 'text-primary-foreground',
       )}
     >
-      <Icon className="relative size-[16px] shrink-0" />
+      <Icon
+        // Filled exactly when the item reads as selected: the resting active
+        // tab, or the one the lozenge is over mid-drag.
+        weight={(active && !dragging) || targeted ? 'fill' : 'regular'}
+        className="relative size-[17px] shrink-0"
+      />
       {/* Labels appear only from `xl`. With nine items, showing
           them at `lg` overflows the viewport by ~250px. */}
       <span className="relative hidden whitespace-nowrap xl:inline">
@@ -657,7 +672,10 @@ export function MobileNavBar() {
                         }}
                       />
                     )}
-                    <Icon className="relative z-10 size-5" />
+                    <Icon
+                      weight={isActive ? 'fill' : 'regular'}
+                      className="relative z-10 size-5"
+                    />
                   </>
                 )}
               </NavLink>
