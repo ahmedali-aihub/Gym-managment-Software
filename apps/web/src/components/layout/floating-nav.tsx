@@ -182,10 +182,14 @@ export function FloatingNav() {
         <span className="mx-0.5 h-5 w-px bg-nav-border" aria-hidden />
 
         {/* Primary links. Labels collapse to icons below `lg`, where the
-            full set would not fit without wrapping. */}
-        <NavRail items={items} />
+            full set would not fit without wrapping. Below `sm` they move to
+            MobileNavBar at the bottom of the screen; left in here as well,
+            they pushed search and the account menu off a phone screen. */}
+        <div className="hidden sm:contents">
+          <NavRail items={items} />
 
-        <span className="mx-0.5 h-5 w-px bg-nav-border" aria-hidden />
+          <span className="mx-0.5 h-5 w-px bg-nav-border" aria-hidden />
+        </div>
 
         {/* Search */}
         <button
