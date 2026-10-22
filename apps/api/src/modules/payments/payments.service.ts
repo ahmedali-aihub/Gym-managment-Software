@@ -546,45 +546,55 @@ class PaymentsService {
   }
 
   /** Members with an outstanding balance — the dashboard's "top defaulters". */
+  /**
+   * Members with the largest outstanding balances.
+   *
+   * One aggregate query — billed minus paid plus refunded, the arithmetic of
+   * calculateBalance — ranked and cut to `limit` inside the database. It
+   * used to load every active and expired member with all their memberships
+   * and payments (over 25,000 rows since the migration) and rank them in
+   * JavaScript, on every dashboard load and again every minute the dashboard
+   * stayed open.
+   */
   async getDefaulters(limit = 10) {
-    const members = await prisma.member.findMany({
-      where: { deletedAt: null, status: { in: ['ACTIVE', 'EXPIRED'] } },
-      select: {
-        id: true,
-        memberId: true,
-        fullName: true,
-        phone: true,
-        photoUrl: true,
-        memberships: { select: { totalPaise: true } },
-        payments: {
-          where: { deletedAt: null },
-          select: { amountPaise: true, refundedPaise: true },
-        },
-      },
-    });
+    const rows = await prisma.$queryRaw<
+      Array<{
+        id: string;
+        memberId: string;
+        fullName: string;
+        phone: string;
+        photoUrl: string | null;
+        balanceDuePaise: bigint | number | string;
+      }>
+    >`
+      SELECT m.id, m."memberId", m."fullName", m.phone, m."photoUrl",
+             COALESCE(b.billed, 0) - COALESCE(p.paid, 0) + COALESCE(p.refunded, 0)
+               AS "balanceDuePaise"
+      FROM members m
+      LEFT JOIN (
+        SELECT "memberId", SUM("totalPaise")::bigint AS billed
+        FROM memberships
+        GROUP BY "memberId"
+      ) b ON b."memberId" = m.id
+      LEFT JOIN (
+        SELECT "memberId",
+               SUM("amountPaise")::bigint AS paid,
+               SUM("refundedPaise")::bigint AS refunded
+        FROM payments
+        WHERE "deletedAt" IS NULL
+        GROUP BY "memberId"
+      ) p ON p."memberId" = m.id
+      WHERE m."deletedAt" IS NULL
+        AND m.status IN ('ACTIVE', 'EXPIRED')
+        AND COALESCE(b.billed, 0) - COALESCE(p.paid, 0) + COALESCE(p.refunded, 0) > 0
+      ORDER BY "balanceDuePaise" DESC, m."memberId"
+      LIMIT ${limit}
+    `;
 
-    return members
-      .map((m) => {
-        const billed = m.memberships.reduce((s, x) => s + x.totalPaise, 0);
-        const paid = m.payments.reduce((s, p) => s + p.amountPaise, 0);
-        const refunded = m.payments.reduce((s, p) => s + p.refundedPaise, 0);
-
-        return {
-          id: m.id,
-          memberId: m.memberId,
-          fullName: m.fullName,
-          phone: m.phone,
-          photoUrl: m.photoUrl,
-          balanceDuePaise: calculateBalance({
-            totalBilledPaise: billed,
-            totalPaidPaise: paid,
-            totalRefundedPaise: refunded,
-          }),
-        };
-      })
-      .filter((m) => m.balanceDuePaise > 0)
-      .sort((a, b) => b.balanceDuePaise - a.balanceDuePaise)
-      .slice(0, limit);
+    return rows.map((row) => ({
+      ...row,
+      balanceDuePaise: Number(row.balanceDuePaise),
+    }));
   }
 }
 
