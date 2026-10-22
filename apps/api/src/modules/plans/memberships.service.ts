@@ -222,12 +222,18 @@ class MembershipsService {
 
     const paid = await prisma.payment.aggregate({
       where: { membershipId: membership.id, deletedAt: null },
-      _sum: { amountPaise: true },
+      _sum: { amountPaise: true, refundedPaise: true },
     });
 
+    // Credit only what the gym kept: money already refunded on this
+    // membership has gone back to the member once and must not be credited
+    // to them a second time.
     const creditPaise = input.creditRemainingDays
       ? calculateProratedCredit({
-          totalPaidPaise: paid._sum.amountPaise ?? 0,
+          totalPaidPaise: Math.max(
+            0,
+            (paid._sum.amountPaise ?? 0) - (paid._sum.refundedPaise ?? 0),
+          ),
           totalDays,
           remainingDays,
         })
