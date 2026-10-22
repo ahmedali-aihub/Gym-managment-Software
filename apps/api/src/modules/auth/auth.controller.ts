@@ -129,7 +129,11 @@ export const authController = {
   },
 
   async createUser(req: Request, res: Response): Promise<void> {
-    const created = await authService.createUser(req.body as CreateUserInput);
+    const actor = requireUser(req);
+    const created = await authService.createUser(
+      req.body as CreateUserInput,
+      actor.role,
+    );
     res.status(201).json({ success: true, data: created });
   },
 

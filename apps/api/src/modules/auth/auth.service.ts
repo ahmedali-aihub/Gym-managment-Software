@@ -6,7 +6,7 @@ import type {
   LoginInput,
   LoginResponse,
 } from '@azf/shared';
-import { normalizePhone } from '@azf/shared';
+import { Role, normalizePhone } from '@azf/shared';
 import type { User } from '@prisma/client';
 import {
   ConflictError,
@@ -208,8 +208,25 @@ class AuthService {
     log.info({ userId }, 'Password changed; all sessions revoked');
   }
 
-  /** Create a staff account. Owner/Manager only — enforced at the route. */
-  async createUser(input: CreateUserInput): Promise<AuthUser> {
+  /**
+   * Create a staff account. Owner/Manager only — enforced at the route.
+   *
+   * The route lets a manager in, so the role being granted is checked here:
+   * a manager may add front-desk staff and trainers, never another manager
+   * or an owner. Without that, a manager could mint an OWNER login and give
+   * themselves everything the role system withholds — refunds, deactivating
+   * staff, the lot.
+   */
+  async createUser(input: CreateUserInput, actorRole: Role): Promise<AuthUser> {
+    if (
+      actorRole !== Role.OWNER &&
+      (input.role === Role.OWNER || input.role === Role.MANAGER)
+    ) {
+      throw new ForbiddenError(
+        'Only an owner can create owner or manager accounts',
+      );
+    }
+
     const existing = await prisma.user.findFirst({
       where: {
         OR: [{ email: input.email }, { phone: input.phone }],
