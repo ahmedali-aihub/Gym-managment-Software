@@ -4,6 +4,7 @@ import {
   addressSchema,
   cuidSchema,
   dobSchema,
+  emailSchema,
   emergencyContactSchema,
   nameSchema,
   optionalEmailSchema,
@@ -116,7 +117,11 @@ export type CreateMemberPayload = z.output<typeof createMemberSchema>;
 export const updateMemberSchema = z.object({
   fullName: nameSchema.optional(),
   phone: phoneSchema.optional(),
-  email: optionalEmailSchema,
+  // Unlike registration, an empty string here means "remove the address"
+  // and is passed through as such. optionalEmailSchema maps it to undefined,
+  // which the update reads as "leave unchanged", so a mistyped email could
+  // never be taken off.
+  email: z.union([z.literal(''), emailSchema]).optional(),
   dateOfBirth: dobSchema.optional(),
   gender: z.nativeEnum(Gender).optional(),
   photoDataUrl: z

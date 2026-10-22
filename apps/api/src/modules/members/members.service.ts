@@ -811,7 +811,8 @@ class MembersService {
       data: {
         ...(input.fullName !== undefined ? { fullName: input.fullName } : {}),
         ...(input.phone !== undefined ? { phone: input.phone } : {}),
-        ...(input.email !== undefined ? { email: input.email ?? null } : {}),
+        // '' clears the address; see updateMemberSchema.
+        ...(input.email !== undefined ? { email: input.email || null } : {}),
         ...(input.dateOfBirth !== undefined
           ? { dateOfBirth: input.dateOfBirth }
           : {}),
