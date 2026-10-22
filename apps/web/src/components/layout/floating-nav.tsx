@@ -19,6 +19,7 @@ import {
   ChatCircleDots,
   Desktop,
   Gear,
+  Key,
   MagnifyingGlass,
   Moon,
   QrCode,
@@ -44,6 +45,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/features/auth/auth-context';
+import { ChangePasswordDialog } from '@/features/auth/change-password-dialog';
 import { useTheme } from '@/hooks/use-theme';
 import { cn } from '@/lib/utils';
 
@@ -55,7 +57,12 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { to: '/dashboard', label: 'Dashboard', icon: SquaresFour },
+  {
+    to: '/dashboard',
+    label: 'Dashboard',
+    icon: SquaresFour,
+    roles: [Role.OWNER, Role.MANAGER],
+  },
   { to: '/members', label: 'Members', icon: UsersThree },
   // Check-in IS a QR scan at the desk.
   { to: '/check-in', label: 'Check-in', icon: QrCode },
@@ -108,6 +115,7 @@ export function FloatingNav() {
   const { theme, setTheme, resolvedTheme } = useTheme();
   const navigate = useNavigate();
   const [scrolled, setScrolled] = React.useState(false);
+  const [passwordOpen, setPasswordOpen] = React.useState(false);
 
   React.useEffect(() => {
     // Threshold rather than a continuous value: a pill that resizes on every
@@ -273,6 +281,11 @@ export function FloatingNav() {
 
             <DropdownMenuSeparator />
 
+            <DropdownMenuItem onSelect={() => setPasswordOpen(true)}>
+              <Key />
+              Change password
+            </DropdownMenuItem>
+
             <DropdownMenuItem destructive onSelect={() => void logout()}>
               <SignOut />
               Sign out
@@ -280,6 +293,8 @@ export function FloatingNav() {
           </DropdownMenuContent>
         </DropdownMenu>
       </motion.nav>
+
+      <ChangePasswordDialog open={passwordOpen} onOpenChange={setPasswordOpen} />
     </div>
   );
 }

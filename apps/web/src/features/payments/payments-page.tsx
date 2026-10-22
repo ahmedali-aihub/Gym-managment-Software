@@ -1,5 +1,6 @@
 import {
   PAYMENT_MODE_LABELS,
+  Role,
   formatDate,
   formatDateTime,
   formatINR,
@@ -35,6 +36,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAuth } from '@/features/auth/auth-context';
 import { api } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
 
@@ -79,6 +81,11 @@ const MODE_VARIANTS: Record<PaymentMode, 'success' | 'info' | 'default' | 'secon
  */
 export function PaymentsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { hasRole } = useAuth();
+
+  // Gym-wide totals are management figures. The API refuses them to the
+  // front desk, and without this the cards sat loading forever for them.
+  const canSeeTotals = hasRole(Role.OWNER, Role.MANAGER);
 
   const page = Number(searchParams.get('page')) || 1;
   const mode = searchParams.get('mode') ?? '';
@@ -122,6 +129,7 @@ export function PaymentsPage() {
       const response = await api.get<{ data: PaymentStats }>('/payments/stats');
       return response.data.data;
     },
+    enabled: canSeeTotals,
   });
 
   const { data, isLoading, isFetching, error, refetch } = useQuery({
@@ -226,22 +234,24 @@ export function PaymentsPage() {
       </div>
 
       {/* Totals */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <SummaryCard
-          label="Collected"
-          value={stats ? formatINRCompact(stats.collectedPaise) : undefined}
-          tone="success"
-        />
-        <SummaryCard
-          label="Pending dues"
-          value={stats ? formatINRCompact(stats.pendingPaise) : undefined}
-          tone="destructive"
-        />
-        <SummaryCard
-          label="Transactions"
-          value={stats ? String(stats.transactionCount) : undefined}
-        />
-      </div>
+      {canSeeTotals && (
+        <div className="grid gap-4 sm:grid-cols-3">
+          <SummaryCard
+            label="Collected"
+            value={stats ? formatINRCompact(stats.collectedPaise) : undefined}
+            tone="success"
+          />
+          <SummaryCard
+            label="Pending dues"
+            value={stats ? formatINRCompact(stats.pendingPaise) : undefined}
+            tone="destructive"
+          />
+          <SummaryCard
+            label="Transactions"
+            value={stats ? String(stats.transactionCount) : undefined}
+          />
+        </div>
+      )}
 
       {/* Toolbar */}
       <Card className="p-3">

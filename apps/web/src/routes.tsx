@@ -1,3 +1,4 @@
+import { Role } from '@azf/shared';
 import { Loader2 } from 'lucide-react';
 import * as React from 'react';
 import {
@@ -147,17 +148,54 @@ function RequireForcedChange({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+const MANAGEMENT: Role[] = [Role.OWNER, Role.MANAGER];
+const FRONT_DESK: Role[] = [Role.OWNER, Role.MANAGER, Role.RECEPTIONIST];
+
+/**
+ * Where each role starts. The dashboard's figures are management
+ * information the API refuses to everyone else; the front desk works from
+ * Check-in, and trainers — who cannot check members in — from the roster.
+ */
+function homePathFor(role: Role): string {
+  if (MANAGEMENT.includes(role)) return '/dashboard';
+  return role === Role.RECEPTIONIST ? '/check-in' : '/members';
+}
+
+/**
+ * Keeps a role off pages whose data the API will refuse it, sending it to
+ * its own home rather than a "Something went wrong" screen. The nav already
+ * hides these links; this covers bookmarks, typed URLs, and the '/dashboard'
+ * that every login and fallback redirect lands on.
+ */
+function RequireRole({
+  roles,
+  children,
+}: {
+  roles: Role[];
+  children: React.ReactNode;
+}) {
+  const { user } = useAuth();
+
+  if (user && !roles.includes(user.role)) {
+    return <Navigate to={homePathFor(user.role)} replace />;
+  }
+
+  return <>{children}</>;
+}
+
 /** AuthProvider needs router context for navigation, so it wraps here. */
 function Root({ children }: { children: React.ReactNode }) {
   return <AuthProvider>{children}</AuthProvider>;
 }
 
-function lazyRoute(Component: React.ComponentType) {
-  return (
+function lazyRoute(Component: React.ComponentType, roles?: Role[]) {
+  const page = (
     <React.Suspense fallback={<RouteLoader />}>
       <Component />
     </React.Suspense>
   );
+
+  return roles ? <RequireRole roles={roles}>{page}</RequireRole> : page;
 }
 
 /**
@@ -207,18 +245,18 @@ export const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: <Navigate to="/dashboard" replace /> },
-      { path: 'dashboard', element: lazyRoute(DashboardPage) },
+      { path: 'dashboard', element: lazyRoute(DashboardPage, MANAGEMENT) },
       { path: 'members', element: lazyRoute(MembersPage) },
-      { path: 'members/new', element: lazyRoute(RegisterMemberPage) },
-      { path: 'members/import', element: lazyRoute(ImportPage) },
+      { path: 'members/new', element: lazyRoute(RegisterMemberPage, FRONT_DESK) },
+      { path: 'members/import', element: lazyRoute(ImportPage, MANAGEMENT) },
       { path: 'members/:id', element: lazyRoute(MemberProfilePage) },
       { path: 'payments', element: lazyRoute(PaymentsPage) },
-      { path: 'plans', element: lazyRoute(PlansPage) },
+      { path: 'plans', element: lazyRoute(PlansPage, MANAGEMENT) },
       { path: 'check-in', element: lazyRoute(CheckInPage) },
       { path: 'messages', element: lazyRoute(MessagesPage) },
-      { path: 'expenses', element: lazyRoute(ExpensesPage) },
-      { path: 'reports', element: lazyRoute(ReportsPage) },
-      { path: 'settings', element: lazyRoute(SettingsPage) },
+      { path: 'expenses', element: lazyRoute(ExpensesPage, MANAGEMENT) },
+      { path: 'reports', element: lazyRoute(ReportsPage, MANAGEMENT) },
+      { path: 'settings', element: lazyRoute(SettingsPage, MANAGEMENT) },
       { path: '*', element: <Navigate to="/dashboard" replace /> },
     ],
   },
