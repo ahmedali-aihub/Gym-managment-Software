@@ -45,6 +45,7 @@ import {
   savePhotoFromDataUrl,
 } from '../../services/storage/photo.service.js';
 import { calculateBalance, calculateBill } from '../payments/billing.js';
+import { getDuesSummary } from '../payments/dues.js';
 
 const log = moduleLogger('members');
 
@@ -682,7 +683,7 @@ class MembersService {
     weekAhead.setDate(weekAhead.getDate() + 7);
     weekAhead.setHours(23, 59, 59, 999);
 
-    const [statusCounts, expiringSoon, billedAgg, paidAgg] = await Promise.all([
+    const [statusCounts, expiringSoon, dues] = await Promise.all([
       prisma.member.groupBy({
         by: ['status'],
         where: { deletedAt: null },
@@ -699,11 +700,7 @@ class MembersService {
           },
         },
       }),
-      prisma.membership.aggregate({ _sum: { totalPaise: true } }),
-      prisma.payment.aggregate({
-        where: { deletedAt: null },
-        _sum: { amountPaise: true, refundedPaise: true },
-      }),
+      getDuesSummary(),
     ]);
 
     const byStatus = new Map(
@@ -717,11 +714,7 @@ class MembersService {
       expired: byStatus.get(MemberStatus.EXPIRED) ?? 0,
       frozen: byStatus.get(MemberStatus.FROZEN) ?? 0,
       cancelled: byStatus.get(MemberStatus.CANCELLED) ?? 0,
-      totalDuesPaise: calculateBalance({
-        totalBilledPaise: billedAgg._sum.totalPaise ?? 0,
-        totalPaidPaise: paidAgg._sum.amountPaise ?? 0,
-        totalRefundedPaise: paidAgg._sum.refundedPaise ?? 0,
-      }),
+      totalDuesPaise: dues.totalPaise,
     };
   }
 

@@ -35,6 +35,7 @@ import {
 import { prisma, TRANSACTION_OPTIONS } from '../../lib/prisma.js';
 import { smsService } from '../../services/sms/sms.service.js';
 import { calculateBalance, derivePaymentStatus } from './billing.js';
+import { getDuesSummary } from './dues.js';
 
 const log = moduleLogger('payments');
 
@@ -423,7 +424,7 @@ class PaymentsService {
         : {}),
     };
 
-    const [totals, byMode, billedAgg] = await Promise.all([
+    const [totals, byMode, dues] = await Promise.all([
       prisma.payment.aggregate({
         where,
         _sum: { amountPaise: true, refundedPaise: true, discountPaise: true },
@@ -435,7 +436,7 @@ class PaymentsService {
         _sum: { amountPaise: true },
         _count: { _all: true },
       }),
-      prisma.membership.aggregate({ _sum: { totalPaise: true } }),
+      getDuesSummary(),
     ]);
 
     const modeMap = Object.fromEntries(
@@ -456,11 +457,10 @@ class PaymentsService {
 
     return {
       collectedPaise,
-      pendingPaise: calculateBalance({
-        totalBilledPaise: billedAgg._sum.totalPaise ?? 0,
-        totalPaidPaise: collectedPaise,
-        totalRefundedPaise: totals._sum.refundedPaise ?? 0,
-      }),
+      // What members owe right now, whatever the date range: subtracting
+      // only the range's payments from all-time billing gave a figure that
+      // meant nothing whenever a range was set.
+      pendingPaise: dues.totalPaise,
       refundedPaise: totals._sum.refundedPaise ?? 0,
       discountPaise: totals._sum.discountPaise ?? 0,
       transactionCount: totals._count._all,

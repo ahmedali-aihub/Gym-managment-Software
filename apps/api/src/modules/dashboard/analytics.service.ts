@@ -1,6 +1,6 @@
 import { MembershipStatus, formatDate } from '@azf/shared';
 import { prisma } from '../../lib/prisma.js';
-import { calculateBalance } from '../payments/billing.js';
+import { getDuesSummary } from '../payments/dues.js';
 
 /**
  * Period analytics.
@@ -266,9 +266,7 @@ class AnalyticsService {
       expiringCount,
       byMode,
       dailyRows,
-      billedTotal,
-      paidTotal,
-      duesMembers,
+      dues,
     ] = await Promise.all([
       prisma.payment.aggregate({
         where: {
@@ -330,12 +328,7 @@ class AnalyticsService {
         },
         select: { paidAt: true, amountPaise: true },
       }),
-      prisma.membership.aggregate({ _sum: { totalPaise: true } }),
-      prisma.payment.aggregate({
-        where: { deletedAt: null },
-        _sum: { amountPaise: true, refundedPaise: true },
-      }),
-      this.countMembersWithDues(),
+      getDuesSummary(),
     ]);
 
     // Bucket payments by day for the trend line.
@@ -364,13 +357,10 @@ class AnalyticsService {
       newMembers: { current: newCurrent, previous: newPrevious },
       renewals: { current: renewalsCurrent, previous: renewalsPrevious },
       expiring: { current: expiringCount },
+      // Point-in-time, not scoped to the period: what members owe right now.
       outstanding: {
-        totalPaise: calculateBalance({
-          totalBilledPaise: billedTotal._sum.totalPaise ?? 0,
-          totalPaidPaise: paidTotal._sum.amountPaise ?? 0,
-          totalRefundedPaise: paidTotal._sum.refundedPaise ?? 0,
-        }),
-        memberCount: duesMembers,
+        totalPaise: dues.totalPaise,
+        memberCount: dues.memberCount,
       },
       byMode: byMode.map((row) => ({
         mode: row.mode,
@@ -379,41 +369,6 @@ class AnalyticsService {
       })),
       daily,
     };
-  }
-
-  /**
-   * How many members owe money.
-   *
-   * Done with two grouped aggregates rather than per-member queries — at a
-   * few thousand members the naive version is thousands of round trips.
-   */
-  private async countMembersWithDues(): Promise<number> {
-    const [billed, paid] = await Promise.all([
-      prisma.membership.groupBy({
-        by: ['memberId'],
-        _sum: { totalPaise: true },
-      }),
-      prisma.payment.groupBy({
-        by: ['memberId'],
-        where: { deletedAt: null },
-        _sum: { amountPaise: true, refundedPaise: true },
-      }),
-    ]);
-
-    const paidBy = new Map(
-      paid.map((row) => [
-        row.memberId,
-        (row._sum.amountPaise ?? 0) - (row._sum.refundedPaise ?? 0),
-      ]),
-    );
-
-    let count = 0;
-    for (const row of billed) {
-      const owed = (row._sum.totalPaise ?? 0) - (paidBy.get(row.memberId) ?? 0);
-      if (owed > 0) count++;
-    }
-
-    return count;
   }
 
   /** Today's collections, broken down for the front desk. */

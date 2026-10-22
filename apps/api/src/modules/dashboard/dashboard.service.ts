@@ -1,6 +1,6 @@
 import { MemberStatus, MembershipStatus } from '@azf/shared';
 import { prisma } from '../../lib/prisma.js';
-import { calculateBalance } from '../payments/billing.js';
+import { getDuesSummary } from '../payments/dues.js';
 
 /**
  * Dashboard aggregation.
@@ -119,7 +119,7 @@ class DashboardService {
       joinsLastMonth,
       revenueThisMonth,
       revenueLastMonth,
-      totalBilled,
+      dues,
       totalPaid,
       expiredLastMonth,
       activeAtStartOfLastMonth,
@@ -160,10 +160,10 @@ class DashboardService {
         },
         _sum: { amountPaise: true },
       }),
-      prisma.membership.aggregate({ _sum: { totalPaise: true } }),
+      getDuesSummary(),
       prisma.payment.aggregate({
         where: { deletedAt: null },
-        _sum: { amountPaise: true, refundedPaise: true },
+        _sum: { amountPaise: true },
       }),
       // Churn inputs: memberships that lapsed last month, against the base
       // that was active going into it.
@@ -185,11 +185,7 @@ class DashboardService {
     const total = statusCounts.reduce((sum, s) => sum + s._count._all, 0);
 
     const collectedPaise = totalPaid._sum.amountPaise ?? 0;
-    const pendingPaise = calculateBalance({
-      totalBilledPaise: totalBilled._sum.totalPaise ?? 0,
-      totalPaidPaise: collectedPaise,
-      totalRefundedPaise: totalPaid._sum.refundedPaise ?? 0,
-    });
+    const pendingPaise = dues.totalPaise;
 
     // Churn as a percentage of the base that could have lapsed. Guarded
     // against a zero base, which would otherwise produce Infinity.
