@@ -202,7 +202,7 @@ class PaymentsService {
     try {
       const invoice = await prisma.invoice.findFirst({
         where: { paymentId: payment.id },
-        select: { invoiceNumber: true },
+        select: { id: true, invoiceNumber: true },
       });
 
       await whatsappService.send({
@@ -216,6 +216,8 @@ class PaymentsService {
           mode: PAYMENT_MODE_LABELS[payment.mode] ?? payment.mode,
           receiptNo: invoice?.invoiceNumber ?? memberCode,
           balance: paiseToRupees(balance.balanceDuePaise).toLocaleString('en-IN'),
+          // Attaches the receipt PDF itself, not just its number.
+          ...(invoice ? { invoiceId: invoice.id } : {}),
         },
       });
     } catch (error) {

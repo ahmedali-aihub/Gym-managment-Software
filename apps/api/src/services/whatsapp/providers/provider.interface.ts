@@ -36,6 +36,17 @@ export interface WhatsAppSendParams {
   body: string;
   /** BCP-47 language of the approved template, e.g. en. */
   languageCode: string;
+  /**
+   * A file for the template's DOCUMENT header — the receipt PDF. Present
+   * exactly when `metaTemplateName` is a template approved with one.
+   */
+  document?: WhatsAppDocument | undefined;
+}
+
+export interface WhatsAppDocument {
+  /** Shown to the member as the attachment's name. */
+  filename: string;
+  content: Buffer;
 }
 
 export interface WhatsAppSendResult {

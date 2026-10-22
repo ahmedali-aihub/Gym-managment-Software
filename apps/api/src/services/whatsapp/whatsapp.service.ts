@@ -10,7 +10,12 @@ import type { Prisma, WhatsAppLog } from '@prisma/client';
 import { gymConfig, whatsappConfig } from '../../config/env.js';
 import { prisma } from '../../lib/prisma.js';
 import { moduleLogger } from '../../lib/logger.js';
+import { generateReceiptPdf } from '../pdf/receipt.service.js';
 import { getWhatsAppProvider } from './providers/index.js';
+import type {
+  WhatsAppDocument,
+  WhatsAppSendResult,
+} from './providers/provider.interface.js';
 
 const log = moduleLogger('whatsapp');
 
@@ -64,6 +69,14 @@ class WhatsAppService {
     const body = renderWhatsAppTemplate(template, merged);
     const e164 = toE164(to);
 
+    // A receipt to attach switches to the version of the template approved
+    // with a document header. The invoiceId stays in `variables`, so every
+    // retry can rebuild the same PDF.
+    const metaTemplateName =
+      merged.invoiceId && template.receiptMetaName
+        ? template.receiptMetaName
+        : template.metaName;
+
     const whatsappLog = await prisma.whatsAppLog.create({
       data: {
         memberId: memberId ?? null,
@@ -71,7 +84,7 @@ class WhatsAppService {
         templateKey,
         body,
         variables: merged as Prisma.InputJsonValue,
-        metaTemplateName: template.metaName,
+        metaTemplateName,
         provider: providerNameToEnum(getWhatsAppProvider().name),
         status: WhatsAppStatus.QUEUED,
         maxAttempts: whatsappConfig.maxRetries,
@@ -112,15 +125,33 @@ class WhatsAppService {
       string,
       string | number
     >;
+    const metaTemplateName = whatsappLog.metaTemplateName ?? template.metaName;
 
-    const result = await provider.send({
-      to: whatsappLog.toPhone,
-      templateKey: whatsappLog.templateKey,
-      metaTemplateName: whatsappLog.metaTemplateName ?? template.metaName,
-      parameters: toWhatsAppParameters(template, variables),
-      body: whatsappLog.body,
-      languageCode: whatsappConfig.languageCode,
-    });
+    const attachment =
+      metaTemplateName === template.receiptMetaName
+        ? await this.receiptDocument(whatsappLog.id, variables.invoiceId)
+        : undefined;
+
+    // The document template cannot go out without its document, so a
+    // receipt that will not build is a failed attempt, not a reason to
+    // send the message bare.
+    const result: WhatsAppSendResult =
+      attachment && 'error' in attachment
+        ? {
+            success: false,
+            errorCode: 'RECEIPT_UNAVAILABLE',
+            errorMessage: attachment.error,
+            retryable: attachment.retryable,
+          }
+        : await provider.send({
+            to: whatsappLog.toPhone,
+            templateKey: whatsappLog.templateKey,
+            metaTemplateName,
+            parameters: toWhatsAppParameters(template, variables),
+            body: whatsappLog.body,
+            languageCode: whatsappConfig.languageCode,
+            document: attachment,
+          });
 
     if (result.success) {
       return prisma.whatsAppLog.update({
@@ -179,7 +210,33 @@ class WhatsAppService {
     });
   }
 
-  /** Rows due for another attempt, oldest first. */
+  /**
+   * The receipt PDF for a message going out on a document template.
+   *
+   * Rebuilt from the invoice on every attempt rather than stored, exactly as
+   * email attachments are: a PDF per message would bloat the log table, and
+   * a retry should attach the receipt as it stands.
+   */
+  private async receiptDocument(
+    whatsappLogId: string,
+    invoiceId: string | number | undefined,
+  ): Promise<WhatsAppDocument | { error: string; retryable: boolean }> {
+    if (typeof invoiceId !== 'string' || !invoiceId) {
+      return { error: 'No receipt is linked to this message', retryable: false };
+    }
+
+    try {
+      const { buffer, filename } = await generateReceiptPdf(invoiceId);
+      return { filename, content: buffer };
+    } catch (error) {
+      log.error(
+        { err: error, whatsappLogId, invoiceId },
+        'Receipt PDF failed to generate for WhatsApp',
+      );
+      return { error: 'The receipt PDF could not be generated', retryable: true };
+    }
+  }
+
   /** Manually retry a failed WhatsApp message from the Messages UI. */
   async retryMessage(whatsappLogId: string): Promise<WhatsAppLog> {
     const whatsappLog = await prisma.whatsAppLog.findUniqueOrThrow({
@@ -206,6 +263,7 @@ class WhatsAppService {
     return this.attemptDelivery(reset);
   }
 
+  /** Rows due for another attempt, oldest first. */
   async getRetryable(limit = 25): Promise<WhatsAppLog[]> {
     return prisma.whatsAppLog.findMany({
       where: {

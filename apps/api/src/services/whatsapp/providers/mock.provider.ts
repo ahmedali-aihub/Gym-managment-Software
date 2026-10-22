@@ -13,7 +13,10 @@ interface MockMessage {
   id: string;
   to: string;
   templateKey: WhatsAppTemplateKey;
+  metaTemplateName: string;
   body: string;
+  /** Name and size of the attached receipt, when there was one. */
+  document?: { filename: string; bytes: number };
   sentAt: Date;
 }
 
@@ -33,11 +36,20 @@ export class MockWhatsAppProvider implements WhatsAppProviderAdapter {
   async send(params: WhatsAppSendParams): Promise<WhatsAppSendResult> {
     const messageId = `wamock_${randomUUID()}`;
 
+    const document = params.document
+      ? {
+          filename: params.document.filename,
+          bytes: params.document.content.length,
+        }
+      : undefined;
+
     this.outbox.push({
       id: messageId,
       to: params.to,
       templateKey: params.templateKey,
+      metaTemplateName: params.metaTemplateName,
       body: params.body,
+      ...(document ? { document } : {}),
       sentAt: new Date(),
     });
 
@@ -45,6 +57,9 @@ export class MockWhatsAppProvider implements WhatsAppProviderAdapter {
       `\n┌─ MOCK WHATSAPP ─────────────────────────────────────\n` +
         `│ To:       ${params.to}\n` +
         `│ Template: ${params.metaTemplateName} (${params.templateKey})\n` +
+        (document
+          ? `│ Attached: ${document.filename} (${Math.round(document.bytes / 1024)} KB)\n`
+          : '') +
         `├─────────────────────────────────────────────────────\n` +
         params.body
           .split('\n')
@@ -56,7 +71,11 @@ export class MockWhatsAppProvider implements WhatsAppProviderAdapter {
     return {
       success: true,
       providerMessageId: messageId,
-      rawResponse: { provider: 'mock', messageId },
+      rawResponse: {
+        provider: 'mock',
+        messageId,
+        ...(document ? { document } : {}),
+      },
     };
   }
 

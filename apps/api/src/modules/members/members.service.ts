@@ -286,6 +286,7 @@ class MembersService {
           planName: plan.name,
           endDate: result.membership.endDate,
           amountPaidPaise: input.payment.amountPaid,
+          invoiceId: result.invoiceId,
           sentById: createdById,
         }),
         'welcome WhatsApp',
@@ -362,6 +363,8 @@ class MembersService {
     planName: string;
     endDate: Date;
     amountPaidPaise: number;
+    /** The opening payment's receipt; null when nothing was paid yet. */
+    invoiceId: string | null;
     sentById: string | null;
   }): Promise<void> {
     try {
@@ -379,6 +382,8 @@ class MembersService {
           plan: params.planName,
           expiryDate: formatDate(params.endDate),
           amount: paiseToRupees(params.amountPaidPaise).toLocaleString('en-IN'),
+          // Attaches the receipt PDF, as the welcome email does.
+          ...(params.invoiceId ? { invoiceId: params.invoiceId } : {}),
         },
       });
     } catch (error) {

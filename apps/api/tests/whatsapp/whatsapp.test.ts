@@ -4,7 +4,11 @@ import {
   renderWhatsAppTemplate,
   toWhatsAppParameters,
 } from '@azf/shared';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  MetaWhatsAppProvider,
+  templateComponents,
+} from '../../src/services/whatsapp/providers/meta.provider.js';
 import { MockWhatsAppProvider } from '../../src/services/whatsapp/providers/mock.provider.js';
 
 /**
@@ -49,6 +53,142 @@ describe('WhatsApp templates', () => {
   it('gives every template a Meta name in snake_case', () => {
     for (const template of Object.values(WHATSAPP_TEMPLATES)) {
       expect(template.metaName).toMatch(/^[a-z][a-z0-9_]*$/);
+    }
+  });
+
+  it('registers the receipt version under its own snake_case name', () => {
+    // Meta fixes the header when it approves a template, so the version with
+    // the PDF must be a separate template, never the plain one renamed.
+    for (const template of Object.values(WHATSAPP_TEMPLATES)) {
+      if (!template.receiptMetaName) continue;
+      expect(template.receiptMetaName).toMatch(/^[a-z][a-z0-9_]*$/);
+      expect(template.receiptMetaName).not.toBe(template.metaName);
+    }
+    expect(WHATSAPP_TEMPLATES.WELCOME.receiptMetaName).toBeDefined();
+    expect(WHATSAPP_TEMPLATES.PAYMENT_RECEIPT.receiptMetaName).toBeDefined();
+  });
+});
+
+describe('templateComponents (Meta payload)', () => {
+  it('puts the receipt in a DOCUMENT header before the body', () => {
+    const components = templateComponents(['Aarav', '2,100'], {
+      id: 'media-123',
+      filename: 'Receipt-RCPT-2026-27-0001.pdf',
+    });
+
+    expect(components).toEqual([
+      {
+        type: 'header',
+        parameters: [
+          {
+            type: 'document',
+            document: {
+              id: 'media-123',
+              filename: 'Receipt-RCPT-2026-27-0001.pdf',
+            },
+          },
+        ],
+      },
+      {
+        type: 'body',
+        parameters: [
+          { type: 'text', text: 'Aarav' },
+          { type: 'text', text: '2,100' },
+        ],
+      },
+    ]);
+  });
+
+  it('sends no header for a plain template', () => {
+    const components = templateComponents(['Aarav']);
+    expect(components).toHaveLength(1);
+    expect(components[0]!.type).toBe('body');
+  });
+});
+
+describe('MetaWhatsAppProvider with a receipt', () => {
+  const receipt = {
+    filename: 'Receipt-RCPT-2026-27-0001.pdf',
+    content: Buffer.from('%PDF-1.4 test'),
+  };
+  const message = {
+    to: '+919876543210',
+    templateKey: WhatsAppTemplateKey.WELCOME,
+    metaTemplateName: 'azf_welcome_pdf',
+    parameters: ['A to Z Fitness', 'Aarav'],
+    body: 'Welcome to A to Z Fitness, Aarav!',
+    languageCode: 'en',
+    document: receipt,
+  };
+
+  it('uploads the PDF, then sends the template with it as the header', async () => {
+    const calls: Array<{ url: string; init: RequestInit | undefined }> = [];
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async (url, init) => {
+        calls.push({ url: String(url), init });
+        const reply = String(url).endsWith('/media')
+          ? { id: 'media-42' }
+          : { messages: [{ id: 'wamid.1' }] };
+        return new Response(JSON.stringify(reply), { status: 200 });
+      });
+
+    try {
+      const result = await new MetaWhatsAppProvider().send(message);
+
+      expect(result.success).toBe(true);
+      expect(calls).toHaveLength(2);
+
+      // 1. The receipt goes up privately, as a file — never as a public link.
+      expect(calls[0]!.url).toMatch(/\/media$/);
+      const form = calls[0]!.init!.body as FormData;
+      expect(form.get('messaging_product')).toBe('whatsapp');
+      expect(form.get('type')).toBe('application/pdf');
+      expect((form.get('file') as File).name).toBe(receipt.filename);
+
+      // 2. The message names the PDF template and carries the media id.
+      const sent = JSON.parse(String(calls[1]!.init!.body)) as {
+        to: string;
+        template: { name: string; components: unknown[] };
+      };
+      expect(sent.to).toBe('919876543210');
+      expect(sent.template.name).toBe('azf_welcome_pdf');
+      expect(sent.template.components[0]).toEqual({
+        type: 'header',
+        parameters: [
+          {
+            type: 'document',
+            document: { id: 'media-42', filename: receipt.filename },
+          },
+        ],
+      });
+    } finally {
+      fetchMock.mockRestore();
+    }
+  });
+
+  it('does not send the message when the upload fails', async () => {
+    const urls: string[] = [];
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async (url) => {
+        urls.push(String(url));
+        return new Response(
+          JSON.stringify({ error: { code: 131053, message: 'Media upload error' } }),
+          { status: 400 },
+        );
+      });
+
+    try {
+      const result = await new MetaWhatsAppProvider().send(message);
+
+      expect(result.success).toBe(false);
+      expect(result.errorCode).toBe('131053');
+      expect(result.errorMessage).toMatch(/^Receipt upload failed/);
+      // Only the upload was attempted; no message went out without its PDF.
+      expect(urls).toHaveLength(1);
+    } finally {
+      fetchMock.mockRestore();
     }
   });
 });
@@ -144,6 +284,28 @@ describe('MockWhatsAppProvider', () => {
     expect(result.providerMessageId).toMatch(/^wamock_/);
     expect(provider.getOutbox()).toHaveLength(1);
     expect(provider.getOutbox()[0]!.to).toBe('+919876543210');
+  });
+
+  it('records an attached receipt', async () => {
+    const provider = new MockWhatsAppProvider();
+
+    await provider.send({
+      to: '+919876543210',
+      templateKey: WhatsAppTemplateKey.WELCOME,
+      metaTemplateName: 'azf_welcome_pdf',
+      parameters: ['A to Z Fitness', 'Aarav'],
+      body: 'Welcome to A to Z Fitness, Aarav!',
+      languageCode: 'en',
+      document: {
+        filename: 'Receipt-RCPT-2026-27-0001.pdf',
+        content: Buffer.from('%PDF-1.4 test'),
+      },
+    });
+
+    expect(provider.getOutbox()[0]!.document).toEqual({
+      filename: 'Receipt-RCPT-2026-27-0001.pdf',
+      bytes: 13,
+    });
   });
 
   it('verifies as configured', async () => {

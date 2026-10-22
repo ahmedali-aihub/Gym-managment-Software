@@ -31,6 +31,17 @@ export interface WhatsAppTemplateDefinition {
   /** Names for {{1}}, {{2}}, … IN ORDER. */
   variables: readonly string[];
   description: string;
+  /**
+   * The same message with the receipt PDF attached, registered with Meta as
+   * a second template: identical body, plus a DOCUMENT header.
+   *
+   * Meta fixes a template's header when it approves it. With a document
+   * header every send must carry a document; without one, none can. A
+   * message that only sometimes has a receipt (a registration may be "pay
+   * later") therefore needs both versions. The document version is used
+   * whenever the message's variables include an `invoiceId`.
+   */
+  receiptMetaName?: string;
 }
 
 export const WHATSAPP_TEMPLATES: Record<
@@ -41,6 +52,7 @@ export const WHATSAPP_TEMPLATES: Record<
     key: WhatsAppTemplateKey.WELCOME,
     label: 'Welcome',
     metaName: 'azf_welcome',
+    receiptMetaName: 'azf_welcome_pdf',
     body:
       'Welcome to {{1}}, {{2}}! Your member ID is {{3}}. Plan: {{4}}, valid until {{5}}. Amount paid: Rs. {{6}}. Questions? Call {{7}}',
     variables: [
@@ -59,6 +71,7 @@ export const WHATSAPP_TEMPLATES: Record<
     key: WhatsAppTemplateKey.PAYMENT_RECEIPT,
     label: 'Payment Receipt',
     metaName: 'azf_payment_receipt',
+    receiptMetaName: 'azf_payment_receipt_pdf',
     body:
       'Payment received, {{1}}. Rs. {{2}} on {{3}} via {{4}}. Receipt {{5}}. Balance due: Rs. {{6}}. — {{7}}',
     variables: [
