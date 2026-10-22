@@ -8,6 +8,7 @@ import express, { type Application } from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { env, isProduction } from './config/env.js';
+import { verifyAccessToken } from './modules/auth/auth.utils.js';
 import {
   errorHandler,
   notFoundHandler,
@@ -29,6 +30,31 @@ import {
   plansRoutes,
 } from './modules/plans/plans.routes.js';
 import { smsRoutes } from './modules/sms/sms.routes.js';
+
+/**
+ * What the general rate limit counts against.
+ *
+ * Everyone at the gym shares one public IP, so a per-IP budget is one budget
+ * for the whole front desk: the check-in screen's polling, a morning queue
+ * of check-ins and the owner's dashboard together could exhaust it and lock
+ * every device out for the rest of the window, at the busiest time of day.
+ * Signed-in requests therefore count against the staff member; anything
+ * without a valid token still counts against the IP. Login keeps its own,
+ * much stricter limiter (auth.routes.ts).
+ */
+function rateLimitKey(req: express.Request): string {
+  const header = req.headers.authorization;
+
+  if (header?.startsWith('Bearer ')) {
+    try {
+      return `user:${verifyAccessToken(header.slice(7)).sub}`;
+    } catch {
+      // Expired or invalid — no identity to trust, so fall back to the IP.
+    }
+  }
+
+  return `ip:${req.ip}`;
+}
 
 export function createApp(): Application {
   const app = express();
@@ -75,6 +101,7 @@ export function createApp(): Application {
       legacyHeaders: false,
       // Health checks should never be throttled.
       skip: (req) => req.path === '/api/health',
+      keyGenerator: rateLimitKey,
       message: {
         success: false,
         error: {
