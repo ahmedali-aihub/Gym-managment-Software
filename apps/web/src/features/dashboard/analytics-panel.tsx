@@ -32,7 +32,6 @@ interface PeriodAnalytics {
   expiring: { current: number };
   outstanding: { totalPaise: number; memberCount: number };
   byMode: Array<{ mode: string; amountPaise: number; count: number }>;
-  daily: Array<{ date: string; amountPaise: number }>;
 }
 
 interface TodayCollection {

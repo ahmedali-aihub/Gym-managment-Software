@@ -219,8 +219,6 @@ export interface PeriodAnalytics {
   outstanding: { totalPaise: number; memberCount: number };
   /** Collections by payment mode, within the period. */
   byMode: Array<{ mode: string; amountPaise: number; count: number }>;
-  /** Daily collections within the period, for the trend sparkline. */
-  daily: Array<{ date: string; amountPaise: number }>;
 }
 
 /**
@@ -265,7 +263,6 @@ class AnalyticsService {
       renewalsPrevious,
       expiringCount,
       byMode,
-      dailyRows,
       dues,
     ] = await Promise.all([
       prisma.payment.aggregate({
@@ -321,26 +318,8 @@ class AnalyticsService {
         _sum: { amountPaise: true },
         _count: { _all: true },
       }),
-      prisma.payment.findMany({
-        where: {
-          deletedAt: null,
-          paidAt: { gte: range.from, lte: range.to },
-        },
-        select: { paidAt: true, amountPaise: true },
-      }),
       getDuesSummary(),
     ]);
-
-    // Bucket payments by day for the trend line.
-    const dayBuckets = new Map<string, number>();
-    for (const payment of dailyRows) {
-      const key = payment.paidAt.toISOString().slice(0, 10);
-      dayBuckets.set(key, (dayBuckets.get(key) ?? 0) + payment.amountPaise);
-    }
-
-    const daily = [...dayBuckets.entries()]
-      .map(([date, amountPaise]) => ({ date, amountPaise }))
-      .sort((a, b) => a.date.localeCompare(b.date));
 
     return {
       period: {
@@ -367,7 +346,6 @@ class AnalyticsService {
         amountPaise: row._sum.amountPaise ?? 0,
         count: row._count._all,
       })),
-      daily,
     };
   }
 

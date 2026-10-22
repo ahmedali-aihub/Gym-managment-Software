@@ -460,12 +460,6 @@ export function buildPeriodAnalytics(
     byModeMap.set(payment.mode, entry);
   }
 
-  const dayBuckets = new Map<string, number>();
-  for (const payment of current) {
-    const key = payment.paidAt.slice(0, 10);
-    dayBuckets.set(key, (dayBuckets.get(key) ?? 0) + payment.amountPaise);
-  }
-
   const withDues = DEMO_MEMBERS.filter((m) => m.balanceDuePaise > 0);
 
   return {
@@ -494,9 +488,6 @@ export function buildPeriodAnalytics(
       memberCount: withDues.length,
     },
     byMode: [...byModeMap.entries()].map(([mode, v]) => ({ mode, ...v })),
-    daily: [...dayBuckets.entries()]
-      .map(([date, amountPaise]) => ({ date, amountPaise }))
-      .sort((a, b) => a.date.localeCompare(b.date)),
   };
 }
 
