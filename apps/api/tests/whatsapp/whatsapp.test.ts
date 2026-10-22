@@ -56,6 +56,25 @@ describe('WhatsApp templates', () => {
     }
   });
 
+  it('passes Meta\'s placement rules, which reject templates outright', () => {
+    for (const template of Object.values(WHATSAPP_TEMPLATES)) {
+      const body = template.body.trim();
+      const order = [...body.matchAll(/\{\{(\d+)\}\}/g)].map((m) => Number(m[1]));
+
+      // A placeholder can expand to many words, so Meta refuses one at
+      // either end of the body.
+      expect(body, `${template.key} starts with a variable`).not.toMatch(/^\{\{\d+\}\}/);
+      expect(body, `${template.key} ends with a variable`).not.toMatch(/\{\{\d+\}\}\W*$/);
+      // Numbered in reading order, and never two placeholders back to back.
+      expect(order, `${template.key} variables out of order`).toEqual(
+        [...order].sort((a, b) => a - b),
+      );
+      expect(body, `${template.key} has adjacent variables`).not.toMatch(
+        /\}\}\s*\{\{/,
+      );
+    }
+  });
+
   it('registers the receipt version under its own snake_case name', () => {
     // Meta fixes the header when it approves a template, so the version with
     // the PDF must be a separate template, never the plain one renamed.

@@ -18,7 +18,12 @@ import { paginationSchema } from './common.schema.js';
  *
  * Submit these to Meta Business Manager → WhatsApp Manager → Message
  * Templates, category UTILITY (not MARKETING — utility templates are
- * cheaper and are not rate-limited per user).
+ * cheaper and are not rate-limited per user). docs/WHATSAPP-SETUP.md lists
+ * every template to submit.
+ *
+ * Meta rejects a body that starts or ends with a variable — a placeholder
+ * can expand to many words — so every body opens and closes on plain text.
+ * The tests enforce that, along with variables appearing in order.
  */
 
 export interface WhatsAppTemplateDefinition {
@@ -54,7 +59,7 @@ export const WHATSAPP_TEMPLATES: Record<
     metaName: 'azf_welcome',
     receiptMetaName: 'azf_welcome_pdf',
     body:
-      'Welcome to {{1}}, {{2}}! Your member ID is {{3}}. Plan: {{4}}, valid until {{5}}. Amount paid: Rs. {{6}}. Questions? Call {{7}}',
+      'Welcome to {{1}}, {{2}}! Your member ID is {{3}}. Plan: {{4}}, valid until {{5}}. Amount paid: Rs. {{6}}. For any questions, call us on {{7}}. See you at the gym!',
     variables: [
       'gymName',
       'name',
@@ -73,7 +78,7 @@ export const WHATSAPP_TEMPLATES: Record<
     metaName: 'azf_payment_receipt',
     receiptMetaName: 'azf_payment_receipt_pdf',
     body:
-      'Payment received, {{1}}. Rs. {{2}} on {{3}} via {{4}}. Receipt {{5}}. Balance due: Rs. {{6}}. — {{7}}',
+      'Thank you, {{1}}! We have received Rs. {{2}} on {{3}} via {{4}}. Receipt number: {{5}}. Balance due: Rs. {{6}}. Team {{7}} wishes you a great workout!',
     variables: [
       'name',
       'amount',
@@ -91,7 +96,7 @@ export const WHATSAPP_TEMPLATES: Record<
     label: 'Expiry Reminder',
     metaName: 'azf_expiry_reminder',
     body:
-      'Hi {{1}}, your {{2}} membership ({{3}}) expires on {{4}}. Renew to keep training without a break. Call {{5}}',
+      'Hi {{1}}, your {{2}} membership ({{3}}) expires on {{4}}. Renew to keep training without a break. Call us on {{5}} to renew today.',
     variables: ['name', 'gymName', 'memberId', 'expiryDate', 'gymPhone'],
     description: 'Sent before a membership lapses.',
   },
@@ -101,7 +106,7 @@ export const WHATSAPP_TEMPLATES: Record<
     label: 'Payment Due',
     metaName: 'azf_payment_due',
     body:
-      'Hi {{1}}, your account {{2}} has a pending balance of Rs. {{3}}. Please settle it on your next visit. — {{4}}, {{5}}',
+      'Hi {{1}}, your account {{2}} has a pending balance of Rs. {{3}}. Please settle it on your next visit to {{4}}. Questions? Call us on {{5}} anytime.',
     variables: ['name', 'memberId', 'amount', 'gymName', 'gymPhone'],
     description: 'Sent to members carrying dues.',
   },
