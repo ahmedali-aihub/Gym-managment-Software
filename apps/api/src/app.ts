@@ -1,3 +1,5 @@
+// Must stay first: everything below computes dates. See the module.
+import './config/timezone.js';
 import path from 'node:path';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
