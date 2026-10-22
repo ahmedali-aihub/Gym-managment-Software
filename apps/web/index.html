@@ -10,6 +10,17 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>A to Z Fitness</title>
 
+    <!-- Fonts load from here rather than an @import in globals.css: an
+         @import is only discovered once the app's stylesheet has finished
+         downloading, which chains three requests before text can render in
+         Inter. From here the browser starts on them straight away. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap"
+    />
+
     <script>
       /**
        * Resolve the theme BEFORE first paint.
