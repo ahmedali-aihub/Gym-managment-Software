@@ -1,7 +1,9 @@
 import { Role } from '@azf/shared';
 import { Router } from 'express';
+import { z } from 'zod';
 import { authenticate, requireRole } from '../../middleware/auth.middleware.js';
 import { asyncHandler } from '../../middleware/error.middleware.js';
+import { validateBody } from '../../middleware/validate.middleware.js';
 import { actorFromRequest } from '../../services/audit/audit.service.js';
 import { importService } from './import.service.js';
 import {
@@ -11,10 +13,24 @@ import {
   parseRow,
   summarise,
   type ParsedMember,
-  type RawRow,
 } from './parse-import.js';
 
 const router = Router();
+
+/**
+ * The browser's CSV reader only ever sends string cells, so anything else is
+ * a malformed request. Rejecting it here returns a 422 the importer can show,
+ * instead of a 500 from deep inside the column mapper.
+ */
+const previewSchema = z.object({
+  headers: z.array(z.string()),
+  rows: z.array(z.record(z.string(), z.string().optional())),
+  dateOrder: z.enum(['day-first', 'month-first']).optional(),
+});
+
+const commitSchema = previewSchema.extend({
+  skipRows: z.array(z.number().int().positive()).optional(),
+});
 
 // Importing thousands of members rewrites the gym's whole roster. Owner and
 // manager only — this is not a front-desk action.
@@ -32,26 +48,25 @@ router.use(requireRole(Role.OWNER, Role.MANAGER));
  */
 router.post(
   '/preview',
+  validateBody(previewSchema),
   asyncHandler(async (req, res) => {
-    const { headers, rows, dateOrder } = req.body as {
-      headers: string[];
-      rows: RawRow[];
-      dateOrder?: 'day-first' | 'month-first';
-    };
+    const { headers, rows, dateOrder } = req.body as z.infer<
+      typeof previewSchema
+    >;
 
-    const { mapping, unmapped } = mapColumns(headers ?? []);
+    const { mapping, unmapped } = mapColumns(headers);
 
     // Detected across the WHOLE column, not per row: a file where every
     // value fits both readings is genuinely ambiguous and the importer must
     // ask rather than guess.
     const dateColumn = mapping.membershipEnd ?? mapping.joinedAt;
     const detected = dateColumn
-      ? detectDateOrder((rows ?? []).map((r) => r[dateColumn]))
+      ? detectDateOrder(rows.map((r) => r[dateColumn]))
       : 'ambiguous';
 
     const order = dateOrder ?? (detected === 'month-first' ? 'month-first' : 'day-first');
 
-    const parsed: ParsedMember[] = (rows ?? []).map((row, index) =>
+    const parsed: ParsedMember[] = rows.map((row, index) =>
       // +2: row 1 is the header, and spreadsheets are 1-indexed, so this
       // matches what the owner sees in Excel.
       parseRow(row, mapping, index + 2, { dateOrder: order }),
@@ -81,16 +96,14 @@ router.post(
 /** Commit an import. Takes the same rows the preview reported on. */
 router.post(
   '/commit',
+  validateBody(commitSchema),
   asyncHandler(async (req, res) => {
-    const { headers, rows, dateOrder, skipRows } = req.body as {
-      headers: string[];
-      rows: RawRow[];
-      dateOrder?: 'day-first' | 'month-first';
-      skipRows?: number[];
-    };
+    const { headers, rows, dateOrder, skipRows } = req.body as z.infer<
+      typeof commitSchema
+    >;
 
-    const { mapping } = mapColumns(headers ?? []);
-    const parsed: ParsedMember[] = (rows ?? []).map((row, index) =>
+    const { mapping } = mapColumns(headers);
+    const parsed: ParsedMember[] = rows.map((row, index) =>
       parseRow(row, mapping, index + 2, {
         dateOrder: dateOrder ?? 'day-first',
       }),
