@@ -231,7 +231,7 @@ export function RegisterMemberPage() {
       return response.data.data;
     },
 
-    onSuccess: (data) => {
+    onSuccess: (data, values) => {
       void queryClient.invalidateQueries({ queryKey: ['members'] });
       void queryClient.invalidateQueries({ queryKey: ['member-stats'] });
       void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
@@ -239,11 +239,12 @@ export function RegisterMemberPage() {
       void queryClient.invalidateQueries({ queryKey: ['today-collection'] });
 
       // What actually goes out — see the "will automatically receive" list.
-      // SMS is not offered on this form, so it must not be promised here.
+      // SMS is not offered on this form, so it must not be promised here,
+      // and a "pay later" registration has no receipt to attach.
+      const channels = data.member.email ? 'WhatsApp and email' : 'WhatsApp';
+      const withReceipt = Number(values.amountPaidRupees) > 0;
       toast.success(`${data.member.memberId} registered`, {
-        description: data.member.email
-          ? 'Welcome WhatsApp and receipt email are on their way.'
-          : 'Welcome WhatsApp is on its way.',
+        description: `Welcome ${channels}${withReceipt ? ' with the receipt' : ''} sent to the member.`,
       });
 
       navigate(`/members/${data.member.id}`);
@@ -479,7 +480,8 @@ export function RegisterMemberPage() {
               <ul className="mt-1.5 space-y-1 text-[12px] text-muted-foreground">
                 <li className="flex items-center gap-2">
                   <MessageCircle className="size-3.5 shrink-0" />
-                  WhatsApp with their member ID, plan and expiry date
+                  WhatsApp with their member ID, plan, expiry date and the
+                  receipt PDF
                 </li>
                 <li className="flex items-center gap-2">
                   <Mail className="size-3.5 shrink-0" />
