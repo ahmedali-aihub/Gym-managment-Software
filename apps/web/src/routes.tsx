@@ -160,6 +160,21 @@ function lazyRoute(Component: React.ComponentType) {
   );
 }
 
+/**
+ * Opt in to React Router v7 behaviour now. Without these, every page logs a
+ * deprecation warning, and the eventual upgrade would change behaviour all
+ * at once. The app uses no loaders, actions or fetchers, so only
+ * v7_relativeSplatPath could matter — and the one splat route redirects to
+ * an absolute path. v7_startTransition is set on RouterProvider in main.tsx.
+ */
+const ROUTER_FUTURE_FLAGS = {
+  v7_relativeSplatPath: true,
+  v7_fetcherPersist: true,
+  v7_normalizeFormMethod: true,
+  v7_partialHydration: true,
+  v7_skipActionErrorRevalidation: true,
+} as const;
+
 export const router = createBrowserRouter([
   {
     path: '/login',
@@ -207,4 +222,4 @@ export const router = createBrowserRouter([
       { path: '*', element: <Navigate to="/dashboard" replace /> },
     ],
   },
-]);
+], { future: ROUTER_FUTURE_FLAGS });

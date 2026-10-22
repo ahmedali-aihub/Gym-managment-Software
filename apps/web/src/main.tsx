@@ -41,7 +41,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             current mode's step, so they need to read resolvedTheme. */}
         <ChartAccentProvider>
           <TooltipProvider delayDuration={300}>
-            <RouterProvider router={router} />
+            <RouterProvider router={router} future={{ v7_startTransition: true }} />
             <Toaster
               position="top-right"
               richColors
