@@ -1,4 +1,4 @@
-import { Role } from '@azf/shared';
+import { Role, queryBooleanSchema } from '@azf/shared';
 import { Router } from 'express';
 import { z } from 'zod';
 import {
@@ -61,7 +61,7 @@ const querySchema = z.object({
   search: z.string().trim().max(100).optional(),
   status: z.enum(STATUSES).optional(),
   source: z.enum(SOURCES).optional(),
-  dueOnly: z.coerce.boolean().optional(),
+  dueOnly: queryBooleanSchema.optional(),
 });
 
 const statusSchema = z.object({

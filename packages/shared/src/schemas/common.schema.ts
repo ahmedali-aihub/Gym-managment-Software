@@ -90,6 +90,25 @@ export const dobSchema = dateSchema
 export const cuidSchema = z.string().cuid('Invalid identifier');
 
 /** Standard pagination query. Every list endpoint accepts these. */
+/**
+ * A boolean that arrives in a query string.
+ *
+ * NOT z.coerce.boolean(): that runs JavaScript's Boolean(), and
+ * Boolean('false') is true — so `?isActive=false` silently meant "active"
+ * and `?hasDues=false` meant "has dues". Only the literal strings
+ * true/false/1/0 (or a real boolean) are accepted; anything else is a
+ * validation error rather than a guess.
+ */
+export const queryBooleanSchema = z.preprocess(
+  (value) =>
+    value === 'true' || value === '1'
+      ? true
+      : value === 'false' || value === '0'
+        ? false
+        : value,
+  z.boolean(),
+);
+
 export const paginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),

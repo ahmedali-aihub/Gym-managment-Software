@@ -1,6 +1,11 @@
 import { z } from 'zod';
 import { PlanType } from '../types/enums.js';
-import { cuidSchema, paginationSchema, paiseSchema } from './common.schema.js';
+import {
+  cuidSchema,
+  paginationSchema,
+  paiseSchema,
+  queryBooleanSchema,
+} from './common.schema.js';
 
 export const createPlanSchema = z
   .object({
@@ -36,7 +41,7 @@ export type UpdatePlanInput = z.infer<typeof updatePlanSchema>;
 export const planQuerySchema = paginationSchema.extend({
   search: z.string().trim().max(100).optional(),
   type: z.nativeEnum(PlanType).optional(),
-  isActive: z.coerce.boolean().optional(),
+  isActive: queryBooleanSchema.optional(),
 });
 
 /**

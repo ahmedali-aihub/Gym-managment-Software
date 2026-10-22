@@ -9,6 +9,7 @@ import {
   optionalEmailSchema,
   paginationSchema,
   phoneSchema,
+  queryBooleanSchema,
 } from './common.schema.js';
 
 /** Fitness goals offered at registration. Multi-select. */
@@ -189,7 +190,7 @@ export const memberQuerySchema = paginationSchema.extend({
   trainerId: cuidSchema.optional(),
   gender: z.nativeEnum(Gender).optional(),
   expiringInDays: z.coerce.number().int().min(0).max(365).optional(),
-  hasDues: z.coerce.boolean().optional(),
+  hasDues: queryBooleanSchema.optional(),
   /**
    * Date-range filters.
    *
