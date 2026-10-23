@@ -13,8 +13,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import type { WhatsAppSendState } from '@/components/common/whatsapp-send-dialog';
 import { api, getErrorMessage } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
+import { openWhatsApp, type WhatsAppMessage } from '@/lib/whatsapp';
 
 /**
  * Send a reminder to one member, over the channels the owner picks.
@@ -50,9 +52,12 @@ export function NotifyDialog({
   member,
   expiryDate,
   balanceDuePaise,
+  onWhatsAppOpened,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Told what WhatsApp was opened with, so the page can show the send dialog. */
+  onWhatsAppOpened?: (state: WhatsAppSendState) => void;
   member: NotifyMember;
   expiryDate: string | null;
   balanceDuePaise: number;
@@ -81,7 +86,11 @@ export function NotifyDialog({
   const mutation = useMutation({
     mutationFn: async () => {
       const response = await api.post<{
-        data: { summary: Record<string, number> };
+        data: {
+          summary: Record<string, number>;
+          /** The reminder for the desk's own WhatsApp, until Meta is connected. */
+          whatsapp: WhatsAppMessage | null;
+        };
       }>('/notifications/reminders', {
         memberIds: [member.id],
         kind,
@@ -90,19 +99,39 @@ export function NotifyDialog({
       return response.data.data;
     },
     onSuccess: (data) => {
+      // Opened from here, while the browser still counts the Send click.
+      const opened = data.whatsapp ? openWhatsApp(data.whatsapp) : false;
+
       const sent: string[] = [];
       if (data.summary.whatsappSent) sent.push('WhatsApp');
       if (data.summary.emailSent) sent.push('email');
 
+      const notes = [
+        data.whatsapp &&
+          (opened
+            ? 'WhatsApp is open with the reminder — press Send.'
+            : 'Open WhatsApp from the dialog to send the reminder.'),
+        data.summary.emailSkipped && 'Email skipped — no address on file.',
+      ].filter(Boolean);
+
       toast.success(
-        sent.length ? `Sent by ${sent.join(' and ')}` : 'Nothing was sent',
-        {
-          description: data.summary.emailSkipped
-            ? 'Email skipped — no address on file.'
-            : undefined,
-        },
+        sent.length
+          ? `Sent by ${sent.join(' and ')}`
+          : data.whatsapp
+            ? 'Reminder ready on WhatsApp'
+            : 'Nothing was sent',
+        { description: notes.length ? notes.join(' ') : undefined },
       );
       onOpenChange(false);
+
+      if (data.whatsapp) {
+        onWhatsAppOpened?.({
+          title: kind === 'EXPIRY_REMINDER' ? 'Renewal reminder' : 'Dues reminder',
+          recipient: member.fullName,
+          message: data.whatsapp,
+          opened,
+        });
+      }
     },
     onError: (error) =>
       toast.error('Could not send', { description: getErrorMessage(error) }),

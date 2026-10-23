@@ -171,10 +171,18 @@ export function RenewalReminderDialog({
         parts.push(`${result.summary.emailSent} by email`);
       }
 
+      // WhatsApp in bulk needs WhatsApp Business connected; until then the
+      // server skips it rather than pretend. Say so, and where to go instead.
+      const notes = [
+        result.summary.emailSkipped &&
+          `${result.summary.emailSkipped} had no email address on file.`,
+        result.summary.whatsappSkipped &&
+          `WhatsApp was not sent to ${result.summary.whatsappSkipped}: bulk WhatsApp needs WhatsApp Business connected. Send one from each member's profile instead.`,
+      ].filter(Boolean);
+
       toast.success(parts.length ? `Sent ${parts.join(', ')}` : 'Nothing sent', {
-        description: result.summary.emailSkipped
-          ? `${result.summary.emailSkipped} had no email address on file.`
-          : undefined,
+        description: notes.length ? notes.join(' ') : undefined,
+        duration: result.summary.whatsappSkipped ? 10_000 : undefined,
       });
       onOpenChange(false);
     },

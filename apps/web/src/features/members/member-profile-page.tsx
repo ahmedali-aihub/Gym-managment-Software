@@ -722,6 +722,7 @@ export function MemberProfilePage() {
         member={data}
         expiryDate={currentMembership?.endDate ?? null}
         balanceDuePaise={data.balance.balanceDuePaise}
+        onWhatsAppOpened={whatsapp.setState}
       />
 
       <EditMemberDialog
