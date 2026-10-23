@@ -14,13 +14,11 @@ import {
   ArrowRight,
   CalendarClock,
   MessageSquare,
-  UserPlus,
   Users,
   Wallet,
 } from 'lucide-react';
 import * as React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { AccentSwitcher } from '@/components/common/accent-switcher';
 import { DateRangePicker } from '@/components/common/date-range-picker';
 import { EmptyState, ErrorState } from '@/components/common/states';
 import { MemberAvatar } from '@/components/ui/avatar';
@@ -184,11 +182,6 @@ export function DashboardPage() {
             })}
           </p>
         </div>
-
-        <Button onClick={() => navigate('/members/new')}>
-          <UserPlus />
-          New member
-        </Button>
       </div>
 
       {/* Period filter drives the analytics row below it. The custom range
@@ -259,14 +252,11 @@ export function DashboardPage() {
       </div>
 
       {/* ── Charts ──────────────────────────────────────────────────── */}
-      {/* The accent switcher sits immediately above the charts it recolours,
-          so the control and its effect are in view together. */}
-      <div className="flex items-center justify-between gap-3 pt-2">
-        <h2 className="font-display text-lg font-semibold tracking-tight">
-          Trends
-        </h2>
-        <AccentSwitcher />
-      </div>
+      {/* Chart colour is a one-time preference; it lives in the account
+          menu beside Light and Dark rather than above every chart. */}
+      <h2 className="pt-2 font-display text-lg font-semibold tracking-tight">
+        Trends
+      </h2>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <ChartCard

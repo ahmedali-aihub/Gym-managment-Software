@@ -9,7 +9,6 @@ import {
   Users,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { AccentSwitcher } from '@/components/common/accent-switcher';
 import { DateRangePicker } from '@/components/common/date-range-picker';
 import { ErrorState } from '@/components/common/states';
 import { Button } from '@/components/ui/button';
@@ -199,7 +198,6 @@ export function ReportsPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <AccentSwitcher />
           <Button
             size="sm"
             onClick={() => void openReport()}

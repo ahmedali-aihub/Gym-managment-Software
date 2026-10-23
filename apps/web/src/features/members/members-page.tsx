@@ -301,11 +301,8 @@ export function MembersPage() {
               Import
             </Button>
           )}
-
-          <Button onClick={() => navigate('/members/new')}>
-            <UserPlus />
-            New member
-          </Button>
+          {/* No "New member" here: the + in the navigation bar is on every
+              page, and a second one beside it only repeated it. */}
         </div>
       </div>
 

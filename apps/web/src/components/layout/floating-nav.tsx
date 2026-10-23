@@ -42,6 +42,11 @@ import {
 import { SegmentedControl } from '@/components/common/segmented-control';
 import { useAuth } from '@/features/auth/auth-context';
 import { ChangePasswordDialog } from '@/features/auth/change-password-dialog';
+import {
+  CHART_ACCENTS,
+  useChartAccent,
+  type ChartAccent,
+} from '@/hooks/use-chart-accent';
 import { useTheme } from '@/hooks/use-theme';
 import { cn } from '@/lib/utils';
 
@@ -109,6 +114,7 @@ const NAV_ITEMS: NavItem[] = [
 export function FloatingNav() {
   const { user, logout, hasRole } = useAuth();
   const { theme, setTheme, resolvedTheme } = useTheme();
+  const { accent, setAccent } = useChartAccent();
   const navigate = useNavigate();
   const [scrolled, setScrolled] = React.useState(false);
   const [passwordOpen, setPasswordOpen] = React.useState(false);
@@ -269,6 +275,37 @@ export function FloatingNav() {
                 </span>
               </DropdownMenuRadioItem>
             </DropdownMenuRadioGroup>
+
+            {/* Lived as a switcher on both the dashboard and Reports; one
+                setting belongs in one place, and it no longer crowds a
+                phone header. */}
+            {hasRole(Role.OWNER, Role.MANAGER) && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Chart colour</DropdownMenuLabel>
+                <DropdownMenuRadioGroup
+                  value={accent}
+                  onValueChange={(value) => setAccent(value as ChartAccent)}
+                >
+                  {CHART_ACCENTS.map((option) => (
+                    <DropdownMenuRadioItem key={option.key} value={option.key}>
+                      {/* The swatch is the current theme's step, so it
+                          previews what the charts will actually paint. */}
+                      <span
+                        className="mr-2 size-3.5 rounded-full ring-1 ring-inset ring-foreground/20"
+                        style={{
+                          backgroundColor:
+                            resolvedTheme === 'dark'
+                              ? option.swatch.dark
+                              : option.swatch.light,
+                        }}
+                      />
+                      {option.label}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </>
+            )}
 
             {/* Phones: pages without a tab in the bottom bar. */}
             {morePages.length > 0 && (
