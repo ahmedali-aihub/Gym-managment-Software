@@ -9,15 +9,50 @@ import { toE164 } from './identifiers.js';
  * link pre-fill text only, so the receipt goes as a signed link the member
  * taps to open the PDF.
  *
- * WhatsApp renders *text* as bold, which is what keeps these scannable on a
- * phone. Lines for values that do not apply are left out entirely rather
- * than shown blank.
+ * All three share one layout, so they read as coming from a business rather
+ * than a personal chat: the gym's name and the document title as a
+ * letterhead, a formal greeting, one labelled fact per line, and a signed
+ * close. WhatsApp renders *text* bold and _text_ italic.
+ *
+ * Each fact line leads with one emoji that names it — a receipt, a calendar,
+ * a card — so the eye finds "how much" and "until when" without reading
+ * every label. They are all single-code-point emoji, which every WhatsApp
+ * build draws the same way; the ones that need a variation selector (🗓️,
+ * 🏋️) can arrive as plain symbols on older phones.
+ *
+ * Lines for values that do not apply are left out entirely rather than shown
+ * blank.
  */
 
-export interface WelcomeChatVariables {
+/** What every message can sign off with. */
+interface Signature {
+  gymName: string;
+  /** "Mehdipatnam, Hyderabad" — under the name in the sign-off. */
+  gymLocation?: string;
+  /** Left out while the gym phone is still the placeholder. */
+  gymPhone?: string;
+}
+
+const RULE = '━━━━━━━━━━━━━━━━';
+
+function letterhead(gymName: string, title: string): string[] {
+  return [`*${gymName.toUpperCase()}*`, `_${title}_`, RULE, ''];
+}
+
+function signOff(v: Signature, contactLine?: string): string[] {
+  const lines: string[] = [];
+  if (contactLine) lines.push(contactLine, '');
+  lines.push('Warm regards,', `*Team ${v.gymName}*`);
+  if (v.gymLocation) lines.push(`📍 ${v.gymLocation}`);
+  return lines;
+}
+
+const callUs = (phone: string | undefined, fallback?: string) =>
+  phone ? `📞 For any assistance, call us on ${phone}.` : fallback;
+
+export interface WelcomeChatVariables extends Signature {
   /** First name. */
   name: string;
-  gymName: string;
   memberId: string;
   plan: string;
   validFrom: string;
@@ -29,45 +64,49 @@ export interface WelcomeChatVariables {
   balanceDue?: string;
   receiptNumber?: string;
   receiptUrl?: string;
-  /** Left out while the gym phone is still the placeholder. */
-  gymPhone?: string;
 }
 
 export function welcomeChatMessage(v: WelcomeChatVariables): string {
   const lines = [
-    `Hi ${v.name}! 👋`,
-    `Welcome to *${v.gymName}*. Your membership is now active.`,
+    ...letterhead(v.gymName, 'Membership Confirmation'),
+    `Dear ${v.name},`,
     '',
-    `*Member ID:* ${v.memberId}`,
-    `*Plan:* ${v.plan}`,
-    `*Valid:* ${v.validFrom} to ${v.validUntil}`,
+    `Welcome to *${v.gymName}*! 🎉 Your membership is now active, and we look forward to being part of your fitness journey.`,
+    '',
+    `🆔 *Member ID:* ${v.memberId}`,
+    `🏆 *Plan:* ${v.plan}`,
+    `📅 *Start Date:* ${v.validFrom}`,
+    `⏳ *Valid Till:* ${v.validUntil}`,
   ];
 
+  const payment: string[] = [];
   if (v.amountPaid) {
-    lines.push(
-      `*Paid:* ₹${v.amountPaid}${v.paymentMode ? ` (${v.paymentMode})` : ''}`,
+    payment.push(
+      `💰 *Amount Paid:* ₹${v.amountPaid}${v.paymentMode ? ` (${v.paymentMode})` : ''}`,
     );
   }
-  if (v.balanceDue) lines.push(`*Balance due:* ₹${v.balanceDue}`);
+  if (v.balanceDue) payment.push(`🔔 *Balance Due:* ₹${v.balanceDue}`);
+  if (v.receiptNumber && v.receiptUrl) {
+    payment.push(`🧾 *Receipt No:* ${v.receiptNumber}`);
+  }
+  if (payment.length > 0) lines.push('', ...payment);
 
   if (v.receiptUrl) {
-    lines.push(
-      '',
-      `🧾 Your receipt${v.receiptNumber ? ` ${v.receiptNumber}` : ''}:`,
-      v.receiptUrl,
-    );
+    lines.push('', '📄 *Download your receipt (PDF):*', v.receiptUrl);
   }
 
-  lines.push('');
-  if (v.gymPhone) lines.push(`Questions? Call us on ${v.gymPhone}.`);
-  lines.push('See you at the gym! 💪');
+  lines.push(
+    '',
+    'Please mention your Member ID at the front desk when you check in.',
+    '',
+    ...signOff(v, callUs(v.gymPhone)),
+  );
 
   return lines.join('\n');
 }
 
-export interface ReceiptChatVariables {
+export interface ReceiptChatVariables extends Signature {
   name: string;
-  gymName: string;
   amount: string;
   paymentMode: string;
   paidOn: string;
@@ -75,73 +114,125 @@ export interface ReceiptChatVariables {
   receiptUrl: string;
   /** Only when something is still owed. */
   balanceDue?: string;
+  /** The membership the payment was for, when it was for one. */
+  plan?: string;
+  validUntil?: string;
 }
 
 export function receiptChatMessage(v: ReceiptChatVariables): string {
-  return [
-    `Hi ${v.name}, thank you for your payment! 🙏`,
+  const lines = [
+    ...letterhead(v.gymName, 'Payment Receipt'),
+    `Dear ${v.name},`,
     '',
-    `*Amount:* ₹${v.amount} (${v.paymentMode})`,
-    `*Date:* ${v.paidOn}`,
-    `*Receipt:* ${v.receiptNumber}`,
-    v.balanceDue ? `*Balance due:* ₹${v.balanceDue}` : '✅ Nothing is due.',
+    'Thank you for your payment. Here are the details for your records.',
     '',
-    '🧾 Download your receipt:',
+    `🧾 *Receipt No:* ${v.receiptNumber}`,
+    `📅 *Date:* ${v.paidOn}`,
+    `💳 *Payment Mode:* ${v.paymentMode}`,
+    `💰 *Amount Paid:* ₹${v.amount}`,
+    v.balanceDue
+      ? `🔔 *Balance Due:* ₹${v.balanceDue}`
+      : '✅ *Balance Due:* Nil',
+  ];
+
+  if (v.balanceDue) {
+    lines.push('_Kindly clear the balance at the front desk on your next visit._');
+  }
+
+  if (v.plan) {
+    lines.push('', `🏆 *Plan:* ${v.plan}`);
+    if (v.validUntil) lines.push(`⏳ *Valid Till:* ${v.validUntil}`);
+  }
+
+  lines.push(
+    '',
+    '📄 *Download your receipt (PDF):*',
     v.receiptUrl,
     '',
-    `— ${v.gymName}`,
-  ].join('\n');
+    ...signOff(v, callUs(v.gymPhone)),
+  );
+
+  return lines.join('\n');
 }
 
-export interface ReminderChatVariables {
+export interface ReminderChatVariables extends Signature {
   kind: 'EXPIRY_REMINDER' | 'PAYMENT_DUE';
   name: string;
-  gymName: string;
   memberId: string;
+  /** The member's latest plan, shown on expiry reminders. */
+  plan?: string;
   /** For EXPIRY_REMINDER. */
   expiryDate?: string;
   /** The date has already passed: "expired on", not "expires on". */
   expired?: boolean;
   /** For PAYMENT_DUE. */
   balanceDue?: string;
-  gymPhone?: string;
 }
 
 export function reminderChatMessage(v: ReminderChatVariables): string {
   if (v.kind === 'EXPIRY_REMINDER') {
-    const contact = v.gymPhone
-      ? `To renew, call us on ${v.gymPhone} or just reply here.`
-      : 'To renew, just reply to this message.';
+    const facts = [`🆔 *Member ID:* ${v.memberId}`];
+    if (v.plan) facts.push(`🏆 *Plan:* ${v.plan}`);
+    facts.push(
+      v.expired
+        ? `⌛ *Expired On:* ${v.expiryDate}`
+        : `⏳ *Expires On:* ${v.expiryDate}`,
+    );
 
     return [
-      `Hi ${v.name}! 👋`,
-      v.expired
-        ? `Your *${v.gymName}* membership (${v.memberId}) expired on *${v.expiryDate}*.`
-        : `Your *${v.gymName}* membership (${v.memberId}) expires on *${v.expiryDate}*.`,
+      ...letterhead(v.gymName, 'Membership Renewal Reminder'),
+      `Dear ${v.name},`,
       '',
       v.expired
-        ? 'Renew to get back to training. 💪'
-        : 'Renew now to keep training without a break. 💪',
-      contact,
+        ? `Your *${v.gymName}* membership has expired. We miss you at the gym!`
+        : `This is a friendly reminder that your *${v.gymName}* membership is due for renewal.`,
       '',
-      `— ${v.gymName}`,
+      ...facts,
+      '',
+      v.expired
+        ? 'Renew today to get back to your training. 💪'
+        : 'Renew before the expiry date to keep training without a break. 💪',
+      '',
+      ...signOff(
+        v,
+        v.gymPhone
+          ? `📞 To renew, call us on ${v.gymPhone} or simply reply to this message.`
+          : '💬 To renew, simply reply to this message.',
+      ),
     ].join('\n');
   }
 
-  const contact = v.gymPhone
-    ? `Questions? Call us on ${v.gymPhone} or reply here.`
-    : 'Questions? Just reply to this message.';
-
   return [
-    `Hi ${v.name},`,
-    `A gentle reminder: your *${v.gymName}* account (${v.memberId}) has a pending balance of *₹${v.balanceDue}*.`,
+    ...letterhead(v.gymName, 'Payment Reminder'),
+    `Dear ${v.name},`,
     '',
-    'Please clear it at the front desk on your next visit.',
-    contact,
-    'Thank you! 🙏',
+    `This is a gentle reminder that a balance is pending on your *${v.gymName}* membership.`,
     '',
-    `— ${v.gymName}`,
+    `🆔 *Member ID:* ${v.memberId}`,
+    `🔔 *Balance Due:* ₹${v.balanceDue}`,
+    '',
+    'Kindly clear it at the front desk on your next visit. Thank you for your prompt attention. 🙏',
+    '',
+    ...signOff(
+      v,
+      v.gymPhone
+        ? `📞 For any questions, call us on ${v.gymPhone} or reply to this message.`
+        : '💬 For any questions, simply reply to this message.',
+    ),
   ].join('\n');
+}
+
+/**
+ * "Praneeth" for the greeting, from a full name. Names are typed at the desk
+ * as "praneeth" or imported as "PRANEETH", and "Dear praneeth," reads
+ * careless; a name typed in mixed case ("McKenzie") is left as it is.
+ */
+export function greetingName(fullName: string): string {
+  const first = fullName.trim().split(/\s+/)[0] ?? fullName;
+  const oneCase = first === first.toLowerCase() || first === first.toUpperCase();
+  return oneCase
+    ? first.charAt(0).toUpperCase() + first.slice(1).toLowerCase()
+    : first;
 }
 
 /** The number as WhatsApp links want it: country code, digits only. */

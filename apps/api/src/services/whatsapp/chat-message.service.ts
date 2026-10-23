@@ -1,7 +1,8 @@
 import {
   PAYMENT_MODE_LABELS,
   daysUntil,
-  formatDate,
+  formatDateLong,
+  greetingName,
   paiseToRupees,
   receiptChatMessage,
   reminderChatMessage,
@@ -25,7 +26,6 @@ export interface ChatMessage {
 }
 
 const rupees = (paise: number) => paiseToRupees(paise).toLocaleString('en-IN');
-const firstName = (fullName: string) => fullName.trim().split(/\s+/)[0] ?? fullName;
 
 /**
  * The gym's number for "call us" lines — or nothing while GYM_PHONE is still
@@ -35,6 +35,22 @@ function gymPhone(): string | undefined {
   const local = gymConfig.phone.replace(/^\s*\+?\s*91/, '');
   return /[1-9]/.test(local) ? gymConfig.phone : undefined;
 }
+
+/**
+ * "Mehdipatnam, Hyderabad" for the sign-off: the locality and the city,
+ * without the state and PIN that the second address line also carries.
+ */
+function gymLocation(): string | undefined {
+  const city = gymConfig.addressLine2.split(',')[0]?.trim();
+  return [gymConfig.addressLine1.trim(), city].filter(Boolean).join(', ') || undefined;
+}
+
+/** What every message signs off with. */
+const signature = () => ({
+  gymName: gymConfig.name,
+  gymLocation: gymLocation(),
+  gymPhone: gymPhone(),
+});
 
 /**
  * Builds the click-to-send WhatsApp messages from the records, so the text
@@ -86,19 +102,18 @@ class ChatMessageService {
     return {
       phone: whatsAppPhone(member.phone),
       text: welcomeChatMessage({
-        name: firstName(member.fullName),
-        gymName: gymConfig.name,
+        ...signature(),
+        name: greetingName(member.fullName),
         memberId: member.memberId,
         plan: membership.plan.name,
-        validFrom: formatDate(membership.startDate),
-        validUntil: formatDate(membership.endDate),
+        validFrom: formatDateLong(membership.startDate),
+        validUntil: formatDateLong(membership.endDate),
         amountPaid: opening ? rupees(opening.amountPaise) : undefined,
         paymentMode: opening ? PAYMENT_MODE_LABELS[opening.mode] : undefined,
         balanceDue:
           balance.balanceDuePaise > 0 ? rupees(balance.balanceDuePaise) : undefined,
         receiptNumber: opening?.invoice?.invoiceNumber,
         receiptUrl: opening?.invoice ? receiptUrl(opening.invoice.id) : undefined,
-        gymPhone: gymPhone(),
       }),
     };
   }
@@ -110,26 +125,39 @@ class ChatMessageService {
       select: {
         id: true,
         invoiceNumber: true,
-        payment: { select: { amountPaise: true, mode: true, paidAt: true } },
+        payment: {
+          select: {
+            amountPaise: true,
+            mode: true,
+            paidAt: true,
+            // What the payment was for, so the receipt can say until when.
+            membership: {
+              select: { endDate: true, plan: { select: { name: true } } },
+            },
+          },
+        },
         member: { select: { id: true, fullName: true, phone: true } },
       },
     });
     if (!invoice?.payment) throw new NotFoundError('Receipt');
 
     const balance = await paymentsService.getMemberBalance(invoice.member.id);
+    const membership = invoice.payment.membership;
 
     return {
       phone: whatsAppPhone(invoice.member.phone),
       text: receiptChatMessage({
-        name: firstName(invoice.member.fullName),
-        gymName: gymConfig.name,
+        ...signature(),
+        name: greetingName(invoice.member.fullName),
         amount: rupees(invoice.payment.amountPaise),
         paymentMode: PAYMENT_MODE_LABELS[invoice.payment.mode],
-        paidOn: formatDate(invoice.payment.paidAt),
+        paidOn: formatDateLong(invoice.payment.paidAt),
         receiptNumber: invoice.invoiceNumber,
         receiptUrl: receiptUrl(invoice.id),
         balanceDue:
           balance.balanceDuePaise > 0 ? rupees(balance.balanceDuePaise) : undefined,
+        plan: membership?.plan.name,
+        validUntil: membership ? formatDateLong(membership.endDate) : undefined,
       }),
     };
   }
@@ -149,26 +177,27 @@ class ChatMessageService {
         memberships: {
           orderBy: { endDate: 'desc' },
           take: 1,
-          select: { endDate: true },
+          select: { endDate: true, plan: { select: { name: true } } },
         },
       },
     });
     if (!member) throw new NotFoundError('Member');
 
-    const endDate = member.memberships[0]?.endDate;
+    const latest = member.memberships[0];
+    const endDate = latest?.endDate;
     const balance = await paymentsService.getMemberBalance(member.id);
 
     return {
       phone: whatsAppPhone(member.phone),
       text: reminderChatMessage({
+        ...signature(),
         kind,
-        name: firstName(member.fullName),
-        gymName: gymConfig.name,
+        name: greetingName(member.fullName),
         memberId: member.memberId,
-        expiryDate: endDate ? formatDate(endDate) : '—',
+        plan: latest?.plan.name,
+        expiryDate: endDate ? formatDateLong(endDate) : '—',
         expired: endDate ? daysUntil(endDate) < 0 : false,
         balanceDue: rupees(balance.balanceDuePaise),
-        gymPhone: gymPhone(),
       }),
     };
   }
