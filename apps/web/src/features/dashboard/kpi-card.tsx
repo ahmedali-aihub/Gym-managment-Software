@@ -126,11 +126,12 @@ export function KpiCard({
         delay: prefersReducedMotion ? 0 : index * 0.06,
         ease: [0.16, 1, 0.3, 1],
       }}
+      className="min-w-0"
     >
       <Card
         interactive={Boolean(onClick)}
         onClick={onClick}
-        className="group relative overflow-hidden p-5"
+        className="group relative h-full overflow-hidden p-4 sm:p-5"
         {...(onClick
           ? {
               role: 'button',
@@ -155,11 +156,11 @@ export function KpiCard({
 
         <div className="relative flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-muted-foreground">
+            <p className="truncate text-[12px] font-medium text-muted-foreground sm:text-sm">
               {label}
             </p>
 
-            <p className="tabular mt-2 font-display text-[28px] font-bold leading-none tracking-tight">
+            <p className="tabular mt-2 font-display text-[22px] font-bold leading-none tracking-tight sm:text-[28px]">
               {format(animated)}
             </p>
 
@@ -199,9 +200,10 @@ export function KpiCard({
             )}
           </div>
 
+          {/* Two cards share a phone's width; there the label carries it. */}
           <div
             className={cn(
-              'flex size-10 shrink-0 items-center justify-center rounded-xl',
+              'hidden size-10 shrink-0 items-center justify-center rounded-xl sm:flex',
               ACCENT_STYLES[accent],
             )}
           >
@@ -215,14 +217,13 @@ export function KpiCard({
 
 export function KpiCardSkeleton() {
   return (
-    <Card className="p-5">
+    <Card className="p-4 sm:p-5">
       <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 space-y-3">
-          <Skeleton className="h-4 w-24" />
-          <Skeleton className="h-7 w-32" />
-          <Skeleton className="h-4 w-28" />
+        <div className="min-w-0 flex-1 space-y-3">
+          <Skeleton className="h-4 w-20 sm:w-24" />
+          <Skeleton className="h-6 w-16 sm:h-7 sm:w-32" />
         </div>
-        <Skeleton className="size-10 rounded-xl" />
+        <Skeleton className="hidden size-10 rounded-xl sm:block" />
       </div>
     </Card>
   );

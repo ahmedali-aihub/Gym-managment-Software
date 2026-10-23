@@ -117,8 +117,14 @@ export function AnalyticsPanel({
     ? percentChange(data.renewals.current, data.renewals.previous)
     : undefined;
 
+  // "All time" has no earlier period to compare with, so a "New" badge and
+  // "0 previously" there were noise, not information.
+  const compare = period !== 'all';
+
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    // Two per row on a phone: four full-width cards stacked were a whole
+    // screen of scrolling before the first chart.
+    <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
       <AnalyticCard
         index={0}
         label={`Collected · ${data?.period.label ?? ''}`}
@@ -128,7 +134,7 @@ export function AnalyticsPanel({
             ? `${data.collected.count} payment${data.collected.count === 1 ? '' : 's'}`
             : undefined
         }
-        change={collectedChange}
+        change={compare ? collectedChange : undefined}
         icon={TrendingUp}
         accent="success"
         loading={isLoading}
@@ -138,8 +144,10 @@ export function AnalyticsPanel({
         index={1}
         label="New members"
         value={data ? String(data.newMembers.current) : undefined}
-        sub={data ? `${data.newMembers.previous} previously` : undefined}
-        change={joinsChange}
+        sub={
+          data && compare ? `${data.newMembers.previous} previously` : undefined
+        }
+        change={compare ? joinsChange : undefined}
         icon={UserPlus}
         accent="primary"
         loading={isLoading}
@@ -149,8 +157,10 @@ export function AnalyticsPanel({
         index={2}
         label="Renewals"
         value={data ? String(data.renewals.current) : undefined}
-        sub={data ? `${data.renewals.previous} previously` : undefined}
-        change={renewalsChange}
+        sub={
+          data && compare ? `${data.renewals.previous} previously` : undefined
+        }
+        change={compare ? renewalsChange : undefined}
         icon={TrendingUp}
         accent="info"
         loading={isLoading}
@@ -357,16 +367,21 @@ function AnalyticCard({
 
   const body = (
     <Card
-      className={cn('p-5', href && 'card-interactive cursor-pointer')}
+      className={cn(
+        'h-full p-4 sm:p-5',
+        href && 'card-interactive cursor-pointer',
+      )}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[13px] text-muted-foreground">{label}</p>
+          <p className="truncate text-[12px] text-muted-foreground sm:text-[13px]">
+            {label}
+          </p>
 
           {loading || value === undefined ? (
-            <Skeleton className="mt-2 h-8 w-24" />
+            <Skeleton className="mt-2 h-7 w-20 sm:h-8 sm:w-24" />
           ) : (
-            <p className="tabular mt-1.5 font-display text-[26px] font-semibold leading-none tracking-tight">
+            <p className="tabular mt-1.5 font-display text-[22px] font-semibold leading-none tracking-tight sm:text-[26px]">
               {value}
             </p>
           )}
@@ -408,9 +423,11 @@ function AnalyticCard({
           </div>
         </div>
 
+        {/* Half a phone's width has no room for it; the label already
+            says what the figure is. */}
         <div
           className={cn(
-            'flex size-9 shrink-0 items-center justify-center rounded-xl',
+            'hidden size-9 shrink-0 items-center justify-center rounded-xl sm:flex',
             accentStyles[accent],
           )}
         >
@@ -425,8 +442,15 @@ function AnalyticCard({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: index * 0.05, ease: [0.16, 1, 0.3, 1] }}
+      className="min-w-0"
     >
-      {href ? <Link to={href}>{body}</Link> : body}
+      {href ? (
+        <Link to={href} className="block h-full">
+          {body}
+        </Link>
+      ) : (
+        body
+      )}
     </motion.div>
   );
 }

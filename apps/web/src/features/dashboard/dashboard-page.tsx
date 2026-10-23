@@ -206,7 +206,9 @@ export function DashboardPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <TodayCollectionCard />
 
-        <div className="grid content-start gap-4 sm:grid-cols-2 lg:col-span-2">
+        {/* Stacked, the counts come first: today's list of payments is
+            long, and the headline numbers should not wait below it. */}
+        <div className="order-first grid grid-cols-2 content-start gap-3 sm:gap-4 lg:order-none lg:col-span-2">
 
           <KpiCard
             index={0}
