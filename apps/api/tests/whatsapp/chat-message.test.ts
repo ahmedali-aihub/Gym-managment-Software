@@ -1,5 +1,6 @@
 import {
   receiptChatMessage,
+  reminderChatMessage,
   welcomeChatMessage,
   whatsAppPhone,
 } from '@azf/shared';
@@ -67,6 +68,31 @@ describe('receiptChatMessage', () => {
     const text = receiptChatMessage({ ...base, balanceDue: '1,000' });
     expect(text).toContain('*Balance due:* ₹1,000');
     expect(text).not.toContain('Nothing is due');
+  });
+});
+
+describe('reminderChatMessage', () => {
+  const base = { name: 'Rahul', gymName: 'A to Z Fitness', memberId: '6374' };
+
+  it('expiry reminder: "expires on" while there is time left', () => {
+    const text = reminderChatMessage({ ...base, kind: 'EXPIRY_REMINDER', expiryDate: '20/11/2026' });
+    expect(text).toContain('expires on *20/11/2026*');
+    expect(text).toContain('Renew now');
+  });
+
+  it('expiry reminder: "expired on" once the date has passed', () => {
+    const text = reminderChatMessage({ ...base, kind: 'EXPIRY_REMINDER', expiryDate: '01/10/2026', expired: true });
+    expect(text).toContain('expired on *01/10/2026*');
+    expect(text).not.toContain('expires on');
+  });
+
+  it('dues reminder shows the balance, and the phone only when set', () => {
+    const withPhone = reminderChatMessage({ ...base, kind: 'PAYMENT_DUE', balanceDue: '1,000', gymPhone: '+91 98765 43210' });
+    expect(withPhone).toContain('pending balance of *₹1,000*');
+    expect(withPhone).toContain('Call us on +91 98765 43210');
+
+    const withoutPhone = reminderChatMessage({ ...base, kind: 'PAYMENT_DUE', balanceDue: '1,000' });
+    expect(withoutPhone).not.toMatch(/Call us|undefined/);
   });
 });
 

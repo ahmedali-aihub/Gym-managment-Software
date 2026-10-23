@@ -1,8 +1,10 @@
 import {
   PAYMENT_MODE_LABELS,
+  daysUntil,
   formatDate,
   paiseToRupees,
   receiptChatMessage,
+  reminderChatMessage,
   welcomeChatMessage,
   whatsAppPhone,
 } from '@azf/shared';
@@ -128,6 +130,45 @@ class ChatMessageService {
         receiptUrl: receiptUrl(invoice.id),
         balanceDue:
           balance.balanceDuePaise > 0 ? rupees(balance.balanceDuePaise) : undefined,
+      }),
+    };
+  }
+
+  /** An expiry or dues reminder, from the member's current state. */
+  async reminder(
+    memberDbId: string,
+    kind: 'EXPIRY_REMINDER' | 'PAYMENT_DUE',
+  ): Promise<ChatMessage> {
+    const member = await prisma.member.findFirst({
+      where: { id: memberDbId, deletedAt: null },
+      select: {
+        id: true,
+        memberId: true,
+        fullName: true,
+        phone: true,
+        memberships: {
+          orderBy: { endDate: 'desc' },
+          take: 1,
+          select: { endDate: true },
+        },
+      },
+    });
+    if (!member) throw new NotFoundError('Member');
+
+    const endDate = member.memberships[0]?.endDate;
+    const balance = await paymentsService.getMemberBalance(member.id);
+
+    return {
+      phone: whatsAppPhone(member.phone),
+      text: reminderChatMessage({
+        kind,
+        name: firstName(member.fullName),
+        gymName: gymConfig.name,
+        memberId: member.memberId,
+        expiryDate: endDate ? formatDate(endDate) : '—',
+        expired: endDate ? daysUntil(endDate) < 0 : false,
+        balanceDue: rupees(balance.balanceDuePaise),
+        gymPhone: gymPhone(),
       }),
     };
   }

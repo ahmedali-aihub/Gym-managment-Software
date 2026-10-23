@@ -178,6 +178,7 @@ class NotificationsService {
     const summary: Record<string, number> = {
       members: results.length,
       whatsappSent: results.filter((r) => r.whatsapp === 'sent').length,
+      whatsappSkipped: results.filter((r) => r.whatsapp === 'skipped').length,
       emailSent: results.filter((r) => r.email === 'sent').length,
       emailSkipped: results.filter((r) => r.email === 'skipped').length,
       smsSent: results.filter((r) => r.sms === 'sent').length,

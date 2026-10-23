@@ -93,6 +93,57 @@ export function receiptChatMessage(v: ReceiptChatVariables): string {
   ].join('\n');
 }
 
+export interface ReminderChatVariables {
+  kind: 'EXPIRY_REMINDER' | 'PAYMENT_DUE';
+  name: string;
+  gymName: string;
+  memberId: string;
+  /** For EXPIRY_REMINDER. */
+  expiryDate?: string;
+  /** The date has already passed: "expired on", not "expires on". */
+  expired?: boolean;
+  /** For PAYMENT_DUE. */
+  balanceDue?: string;
+  gymPhone?: string;
+}
+
+export function reminderChatMessage(v: ReminderChatVariables): string {
+  if (v.kind === 'EXPIRY_REMINDER') {
+    const contact = v.gymPhone
+      ? `To renew, call us on ${v.gymPhone} or just reply here.`
+      : 'To renew, just reply to this message.';
+
+    return [
+      `Hi ${v.name}! 👋`,
+      v.expired
+        ? `Your *${v.gymName}* membership (${v.memberId}) expired on *${v.expiryDate}*.`
+        : `Your *${v.gymName}* membership (${v.memberId}) expires on *${v.expiryDate}*.`,
+      '',
+      v.expired
+        ? 'Renew to get back to training. 💪'
+        : 'Renew now to keep training without a break. 💪',
+      contact,
+      '',
+      `— ${v.gymName}`,
+    ].join('\n');
+  }
+
+  const contact = v.gymPhone
+    ? `Questions? Call us on ${v.gymPhone} or reply here.`
+    : 'Questions? Just reply to this message.';
+
+  return [
+    `Hi ${v.name},`,
+    `A gentle reminder: your *${v.gymName}* account (${v.memberId}) has a pending balance of *₹${v.balanceDue}*.`,
+    '',
+    'Please clear it at the front desk on your next visit.',
+    contact,
+    'Thank you! 🙏',
+    '',
+    `— ${v.gymName}`,
+  ].join('\n');
+}
+
 /** The number as WhatsApp links want it: country code, digits only. */
 export function whatsAppPhone(phone: string): string {
   return toE164(phone).slice(1);

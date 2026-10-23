@@ -4,6 +4,11 @@ import { z } from 'zod';
 import { authenticate, requireRole, requireUser } from '../../middleware/auth.middleware.js';
 import { asyncHandler } from '../../middleware/error.middleware.js';
 import { validateBody } from '../../middleware/validate.middleware.js';
+import { whatsappConfig } from '../../config/env.js';
+import {
+  chatMessageOrNull,
+  chatMessageService,
+} from '../../services/whatsapp/chat-message.service.js';
 import {
   notificationsService,
   type NotificationChannel,
@@ -50,7 +55,20 @@ router.post(
       sentById: actor.sub,
     });
 
-    res.json({ success: true, data: result });
+    // Until Meta is connected the app cannot send WhatsApp itself. For one
+    // member the desk can — from its own WhatsApp, with this text. Many at
+    // once cannot be clicked through, so bulk reminders get none.
+    const whatsapp =
+      !whatsappConfig.live &&
+      input.channels.includes('whatsapp') &&
+      input.memberIds.length === 1
+        ? await chatMessageOrNull(
+            chatMessageService.reminder(input.memberIds[0]!, input.kind),
+            { memberDbId: input.memberIds[0] },
+          )
+        : null;
+
+    res.json({ success: true, data: { ...result, whatsapp } });
   }),
 );
 
