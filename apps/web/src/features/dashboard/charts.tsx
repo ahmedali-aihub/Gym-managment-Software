@@ -497,14 +497,24 @@ export interface DistributionSlice {
  * (by popularity), so a ramp is honest here where it would not be for
  * nominal categories. A 2px surface gap separates each segment.
  */
+/** Plans listed under the bar before the rest fold behind "Show all". */
+const PLAN_LIST_LIMIT = 6;
+
 export function PlanDistributionChart({ data }: { data: DistributionSlice[] }) {
   const { state, setState, clear } = useTooltip();
   const containerRef = React.useRef<HTMLDivElement>(null);
+  const [showAll, setShowAll] = React.useState(false);
 
   if (data.length === 0) return <ChartEmpty />;
 
   const sorted = [...data].sort((a, b) => b.value - a.value);
   const total = sorted.reduce((sum, row) => sum + row.value, 0) || 1;
+  // Imported history brings a long tail of one-off plans; listing every one
+  // made this card a screen tall on a phone. The bar still shows them all.
+  // Folding a single row would save nothing, hence the +1.
+  const foldable = sorted.length > PLAN_LIST_LIMIT + 1;
+  const listed =
+    foldable && !showAll ? sorted.slice(0, PLAN_LIST_LIMIT) : sorted;
 
   return (
     <div ref={containerRef} className="relative">
@@ -566,7 +576,7 @@ export function PlanDistributionChart({ data }: { data: DistributionSlice[] }) {
 
       {/* Direct labels — identity is never colour-alone. */}
       <div className="mt-4 space-y-2">
-        {sorted.map((row, index) => {
+        {listed.map((row, index) => {
           const share = Math.round((row.value / total) * 100);
           const opacity = 1 - index * (0.55 / Math.max(1, sorted.length - 1));
 
@@ -595,6 +605,21 @@ export function PlanDistributionChart({ data }: { data: DistributionSlice[] }) {
           );
         })}
       </div>
+
+      {foldable && (
+        <button
+          type="button"
+          onClick={() => setShowAll((value) => !value)}
+          aria-expanded={showAll}
+          className={cn(
+            'mt-3 text-[12px] font-medium text-muted-foreground underline-offset-4',
+            'transition-colors hover:text-foreground hover:underline',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          )}
+        >
+          {showAll ? 'Show fewer' : `Show all ${sorted.length} plans`}
+        </button>
+      )}
 
       <ChartTooltip state={state} />
     </div>
@@ -898,86 +923,92 @@ export function PeakHoursHeatmap({ data }: { data: HeatmapCell[] }) {
         </p>
       )}
 
-      <div className="overflow-x-auto">
-        <div className="min-w-[520px]">
-          <div className="mb-1.5 flex gap-[3px] pl-9">
-            {HOURS.map((hour) => (
-              <div
-                key={hour}
-                className="flex-1 text-center text-[9px] text-muted-foreground"
-              >
-                {hour % 3 === 0 ? formatHour(hour) : ''}
+      {/* No minimum width: at 520px a phone showed half the day and hid the
+          evening behind a sideways scroll. Seventeen hours still fit a phone
+          at about 13px a cell. */}
+      <div>
+        <div className="mb-1.5 flex gap-[2px] pl-8 sm:gap-[3px] sm:pl-9">
+          {HOURS.map((hour) => (
+            <div
+              key={hour}
+              // min-w-0 so "12pm" overhangs its cell instead of widening the
+              // column and pushing the labels out of line with the grid.
+              className="min-w-0 flex-1 whitespace-nowrap text-center text-[9px] text-muted-foreground"
+            >
+              {hour % 3 === 0 ? formatHour(hour) : ''}
+            </div>
+          ))}
+        </div>
+
+        <div className="space-y-[2px] sm:space-y-[3px]">
+          {DAY_LABELS.map((dayLabel, dayIndex) => (
+            <div
+              key={dayLabel}
+              className="flex items-center gap-[2px] sm:gap-[3px]"
+            >
+              <div className="w-8 shrink-0 text-[10px] font-medium text-muted-foreground sm:w-9">
+                {dayLabel}
               </div>
-            ))}
-          </div>
+              {HOURS.map((hour) => {
+                const count = lookup.get(`${dayIndex}-${hour}`) ?? 0;
+                const intensity = count / max;
 
-          <div className="space-y-[3px]">
-            {DAY_LABELS.map((dayLabel, dayIndex) => (
-              <div key={dayLabel} className="flex items-center gap-[3px]">
-                <div className="w-9 shrink-0 text-[10px] font-medium text-muted-foreground">
-                  {dayLabel}
-                </div>
-                {HOURS.map((hour) => {
-                  const count = lookup.get(`${dayIndex}-${hour}`) ?? 0;
-                  const intensity = count / max;
+                return (
+                  <button
+                    key={hour}
+                    type="button"
+                    className={cn(
+                      'aspect-square min-w-0 flex-1 rounded-[3px] transition-transform',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                      count > 0 && 'hover:scale-125 hover:ring-1 hover:ring-ring',
+                    )}
+                    style={{
+                      backgroundColor:
+                        count === 0
+                          ? 'hsl(var(--muted))'
+                          : `hsl(var(--chart-accent) / ${0.12 + intensity * 0.88})`,
+                    }}
+                    aria-label={`${dayLabel} ${formatHour(hour)}: ${count} check-ins`}
+                    onPointerEnter={(event) => {
+                      const box = containerRef.current?.getBoundingClientRect();
+                      if (!box) return;
+                      setState({
+                        x: event.clientX - box.left,
+                        y: event.clientY - box.top,
+                        title: `${dayLabel} · ${formatHour(hour)}`,
+                        rows: [
+                          {
+                            label: 'Check-ins',
+                            value: String(count),
+                            color: ACCENT,
+                          },
+                        ],
+                      });
+                    }}
+                    onPointerLeave={clear}
+                    onBlur={clear}
+                  />
+                );
+              })}
+            </div>
+          ))}
+        </div>
 
-                  return (
-                    <button
-                      key={hour}
-                      type="button"
-                      className={cn(
-                        'aspect-square flex-1 rounded-[3px] transition-transform',
-                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                        count > 0 && 'hover:scale-125 hover:ring-1 hover:ring-ring',
-                      )}
-                      style={{
-                        backgroundColor:
-                          count === 0
-                            ? 'hsl(var(--muted))'
-                            : `hsl(var(--chart-accent) / ${0.12 + intensity * 0.88})`,
-                      }}
-                      aria-label={`${dayLabel} ${formatHour(hour)}: ${count} check-ins`}
-                      onPointerEnter={(event) => {
-                        const box = containerRef.current?.getBoundingClientRect();
-                        if (!box) return;
-                        setState({
-                          x: event.clientX - box.left,
-                          y: event.clientY - box.top,
-                          title: `${dayLabel} · ${formatHour(hour)}`,
-                          rows: [
-                            {
-                              label: 'Check-ins',
-                              value: String(count),
-                              color: ACCENT,
-                            },
-                          ],
-                        });
-                      }}
-                      onPointerLeave={clear}
-                      onBlur={clear}
-                    />
-                  );
-                })}
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-3 flex items-center justify-end gap-1.5 text-[10px] text-muted-foreground">
-            <span>Quiet</span>
-            {[0, 0.25, 0.5, 0.75, 1].map((step) => (
-              <div
-                key={step}
-                className="size-2.5 rounded-[2px]"
-                style={{
-                  backgroundColor:
-                    step === 0
-                      ? 'hsl(var(--muted))'
-                      : `hsl(var(--chart-accent) / ${0.12 + step * 0.88})`,
-                }}
-              />
-            ))}
-            <span>Busy</span>
-          </div>
+        <div className="mt-3 flex items-center justify-end gap-1.5 text-[10px] text-muted-foreground">
+          <span>Quiet</span>
+          {[0, 0.25, 0.5, 0.75, 1].map((step) => (
+            <div
+              key={step}
+              className="size-2.5 rounded-[2px]"
+              style={{
+                backgroundColor:
+                  step === 0
+                    ? 'hsl(var(--muted))'
+                    : `hsl(var(--chart-accent) / ${0.12 + step * 0.88})`,
+              }}
+            />
+          ))}
+          <span>Busy</span>
         </div>
       </div>
 
