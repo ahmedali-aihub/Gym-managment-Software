@@ -3,6 +3,7 @@ import {
   PAYMENT_MODE_LABELS,
   Role,
   formatDate,
+  formatDateLong,
   formatDateTime,
   formatINR,
   formatPhone,
@@ -12,6 +13,7 @@ import {
   daysUntil,
   type MemberStatus,
   type PaymentMode,
+  type PaymentStatus,
 } from '@azf/shared';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -103,6 +105,8 @@ interface MemberProfile {
   payments: Array<{
     id: string;
     amountPaise: number;
+    refundedPaise: number;
+    status: PaymentStatus;
     mode: PaymentMode;
     paidAt: string;
     reference: string | null;
@@ -204,6 +208,12 @@ export function MemberProfilePage() {
   );
 
   const daysLeft = currentMembership ? daysUntil(currentMembership.endDate) : null;
+
+  // Newest first from the API. A fully refunded, failed or pending payment is
+  // not what the member last paid, so it is skipped.
+  const lastPayment = data.payments.find(
+    (payment) => payment.status === 'PAID' || payment.status === 'PARTIAL',
+  );
 
   return (
     <div className="space-y-6">
@@ -377,15 +387,30 @@ export function MemberProfilePage() {
                 daysLeft !== null && daysLeft <= 7 ? 'warning' : 'default'
               }
             />
+            {/* The last payment, not the lifetime total: what the desk is
+                asked about is "when did they last pay, and how much". */}
             <StatCard
-              label="Total paid"
-              value={formatINR(data.balance.totalPaidPaise, {
-                showDecimals: false,
-              })}
-              sub={`of ${formatINR(data.balance.totalBilledPaise, {
-                showDecimals: false,
-              })} billed`}
-              tone="success"
+              label="Last paid"
+              value={
+                lastPayment
+                  ? formatINR(lastPayment.amountPaise, { showDecimals: false })
+                  : '—'
+              }
+              sub={
+                lastPayment
+                  ? [
+                      formatDateLong(lastPayment.paidAt),
+                      PAYMENT_MODE_LABELS[lastPayment.mode],
+                      lastPayment.refundedPaise > 0 &&
+                        `${formatINR(lastPayment.refundedPaise, {
+                          showDecimals: false,
+                        })} refunded`,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')
+                  : 'No payments yet'
+              }
+              tone={lastPayment ? 'success' : 'default'}
             />
             <StatCard
               label="Balance due"
