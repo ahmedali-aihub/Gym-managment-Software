@@ -209,7 +209,9 @@ export function CheckInPage() {
                     ref={inputRef}
                     value={input}
                     onChange={(event) => setInput(event.target.value)}
-                    placeholder="Scan QR or type member number"
+                    // Short enough for a phone in monospace; the longer
+                    // "…member number" was cut off mid-word there.
+                    placeholder="Scan QR or type ID"
                     icon={<ScanLine />}
                     autoComplete="off"
                     // Scanners emit characters fast; autocorrect on mobile

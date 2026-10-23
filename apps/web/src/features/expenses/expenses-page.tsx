@@ -196,7 +196,8 @@ export function ExpensesPage() {
       </div>
 
       {/* ── P&L headline ─────────────────────────────────────────────── */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Two across on a phone, like the dashboard's figures. */}
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <PnlCard
           label="Income"
           value={data ? formatINRCompact(data.incomePaise) : undefined}
@@ -498,10 +499,17 @@ function PnlCard({
   emphasis?: boolean;
 }) {
   return (
-    <Card className={cn('p-5', emphasis && 'ring-1 ring-primary/30')}>
+    <Card
+      className={cn(
+        'h-full min-w-0 p-4 sm:p-5',
+        emphasis && 'ring-1 ring-primary/30',
+      )}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="text-[13px] text-muted-foreground">{label}</p>
+          <p className="truncate text-[12px] text-muted-foreground sm:text-[13px]">
+            {label}
+          </p>
 
           {value === undefined ? (
             <Skeleton className="mt-2 h-8 w-24" />
@@ -509,7 +517,9 @@ function PnlCard({
             <p
               className={cn(
                 'tabular mt-1.5 font-display font-semibold leading-none tracking-tight',
-                emphasis ? 'text-[28px]' : 'text-[24px]',
+                emphasis
+                  ? 'text-[24px] sm:text-[28px]'
+                  : 'text-[22px] sm:text-[24px]',
                 tone === 'success' ? 'text-success' : 'text-destructive',
               )}
             >
@@ -520,9 +530,10 @@ function PnlCard({
           <p className="mt-2 text-[11px] text-muted-foreground">{sub}</p>
         </div>
 
+        {/* No room beside the figure in half a phone's width. */}
         <div
           className={cn(
-            'flex size-9 shrink-0 items-center justify-center rounded-xl',
+            'hidden size-9 shrink-0 items-center justify-center rounded-xl sm:flex',
             tone === 'success'
               ? 'bg-success/10 text-success'
               : 'bg-destructive/10 text-destructive',
