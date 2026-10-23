@@ -71,6 +71,9 @@ export function SegmentedControl<T extends string>({
 
   const x = useMotionValue(0);
   const dragWidthRef = React.useRef<number | null>(null);
+  // Set when a press on the handle turned into a drag, so the click that
+  // follows the release is not taken for a tap.
+  const draggedRef = React.useRef(false);
   // False until positioned once, so the marker does not fly in from x=0.
   const settledRef = React.useRef(false);
 
@@ -209,7 +212,11 @@ export function SegmentedControl<T extends string>({
             dragElastic={0}
             dragMomentum={false}
             style={{ x, width: markerWidth }}
+            onPointerDown={() => {
+              draggedRef.current = false;
+            }}
             onDragStart={() => {
+              draggedRef.current = true;
               dragWidthRef.current = activeBound.width;
               setDragging(true);
             }}
@@ -229,6 +236,14 @@ export function SegmentedControl<T extends string>({
               // controlled motion value, and setting it skips the spring.
               if (target) void animate(x, target.left, SPRING);
               if (option && option.value !== value) onChange(option.value);
+            }}
+            // The handle covers the selected option, so without this a tap
+            // on it never reached the option underneath — re-tapping a tab
+            // did nothing. The click that ends a drag is not a tap.
+            onClick={() => {
+              if (draggedRef.current) return;
+              const selected = options[activeIndex];
+              if (selected) onChange(selected.value);
             }}
             className={cn(
               'absolute left-0 top-0 z-30 rounded-full',

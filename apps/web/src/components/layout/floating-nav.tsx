@@ -117,13 +117,28 @@ export function FloatingNav() {
   const { accent, setAccent } = useChartAccent();
   const navigate = useNavigate();
   const [scrolled, setScrolled] = React.useState(false);
+  const [tucked, setTucked] = React.useState(false);
   const [passwordOpen, setPasswordOpen] = React.useState(false);
 
   React.useEffect(() => {
+    const phone = window.matchMedia('(max-width: 639px)');
+    let lastY = window.scrollY;
+
     // Threshold rather than a continuous value: a pill that resizes on every
     // scroll frame is distracting, and it forces a layout recalculation on
     // each one.
-    const onScroll = () => setScrolled(window.scrollY > 12);
+    const onScroll = () => {
+      const y = window.scrollY;
+      setScrolled(y > 12);
+
+      // Phones only: there the pill floats over a narrow column and covers a
+      // line of whatever is being read. It tucks away while scrolling down
+      // and returns on any scroll up; navigation stays in the bottom bar
+      // throughout. The 8px dead band ignores the jitter of a resting thumb.
+      if (!phone.matches || y < 80) setTucked(false);
+      else if (Math.abs(y - lastY) > 8) setTucked(y > lastY);
+      if (Math.abs(y - lastY) > 8 || y < 80) lastY = y;
+    };
     onScroll();
 
     window.addEventListener('scroll', onScroll, { passive: true });
@@ -150,7 +165,7 @@ export function FloatingNav() {
           scrolled ? 'px-2 py-1.5 shadow-pill' : 'px-2.5 py-2 shadow-medium',
         )}
         initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
+        animate={tucked ? { y: -88, opacity: 0 } : { y: 0, opacity: 1 }}
         transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
         aria-label="Main navigation"
       >
@@ -759,7 +774,16 @@ export function MobileNavBar() {
           ariaLabel="Main sections"
           className="glass gap-0.5 p-1.5 shadow-pill"
           value={current}
-          onChange={(to) => navigate(to)}
+          onChange={(to) => {
+            // Tapping the tab you are on takes you to its top, the way iOS
+            // tab bars do. From a member's profile, Members is a new page —
+            // the list — so that still navigates.
+            if (location.pathname === to) {
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            } else {
+              navigate(to);
+            }
+          }}
           options={tabs.map((tab) => ({
             value: tab.to,
             label: tab.label,
