@@ -58,7 +58,9 @@ import {
 } from '@/components/ui/misc';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RecordPaymentDialog } from '@/features/payments/record-payment-dialog';
+import { WhatsappLogo } from '@/components/icons/nav-icons';
 import { api, getErrorMessage } from '@/lib/api-client';
+import type { WhatsAppMessage } from '@/lib/whatsapp';
 import { EditMemberDialog } from './edit-member-dialog';
 import { FreezeDialog } from './member-dialogs';
 import { NotifyDialog } from './notify-dialog';
@@ -410,6 +412,29 @@ export function MemberProfilePage() {
               Send reminder
             </Button>
 
+            {canEdit && (
+              <Button
+                size="sm"
+                variant="outline"
+                loading={whatsapp.sending}
+                loadingText="Opening…"
+                onClick={() =>
+                  void whatsapp.send(
+                    async () =>
+                      (
+                        await api.get<{ data: WhatsAppMessage }>(
+                          `/members/${data.id}/whatsapp/welcome`,
+                        )
+                      ).data.data,
+                    { title: 'Welcome message', recipient: data.fullName },
+                  )
+                }
+              >
+                <WhatsappLogo weight="fill" className="text-[#25D366]" />
+                Welcome on WhatsApp
+              </Button>
+            )}
+
             <Button
               size="sm"
               variant="outline"
@@ -511,6 +536,32 @@ export function MemberProfilePage() {
                                 >
                                   Receipt
                                 </button>
+                                {canEdit && (
+                                  <>
+                                    {' · '}
+                                    <button
+                                      type="button"
+                                      disabled={whatsapp.sending}
+                                      onClick={() =>
+                                        void whatsapp.send(
+                                          async () =>
+                                            (
+                                              await api.get<{ data: WhatsAppMessage }>(
+                                                `/invoices/${payment.invoice!.id}/whatsapp`,
+                                              )
+                                            ).data.data,
+                                          {
+                                            title: 'Payment receipt',
+                                            recipient: data.fullName,
+                                          },
+                                        )
+                                      }
+                                      className="underline underline-offset-2 transition-colors hover:text-[#25D366] disabled:opacity-50"
+                                    >
+                                      WhatsApp
+                                    </button>
+                                  </>
+                                )}
                               </>
                             )}
                           </div>
