@@ -1,10 +1,5 @@
 import { Role } from '@azf/shared';
-import {
-  AnimatePresence,
-  animate,
-  motion,
-  useMotionValue,
-} from 'framer-motion';
+import { animate, motion, useMotionValue } from 'framer-motion';
 // Phosphor glyphs rather than lucide for the navigation chrome. Lucide's
 // defaults (LayoutDashboard, Users, CreditCard…) are the icon set nearly
 // every generated admin template ships with, and they read that way.
@@ -44,6 +39,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { SegmentedControl } from '@/components/common/segmented-control';
 import { useAuth } from '@/features/auth/auth-context';
 import { ChangePasswordDialog } from '@/features/auth/change-password-dialog';
 import { useTheme } from '@/hooks/use-theme';
@@ -131,6 +127,7 @@ export function FloatingNav() {
   const items = NAV_ITEMS.filter(
     (item) => !item.roles || (user && item.roles.includes(user.role)),
   );
+  const morePages = morePagesFor(user?.role);
 
   function openCommandPalette() {
     document.dispatchEvent(
@@ -272,6 +269,26 @@ export function FloatingNav() {
                 </span>
               </DropdownMenuRadioItem>
             </DropdownMenuRadioGroup>
+
+            {/* Phones: pages without a tab in the bottom bar. */}
+            {morePages.length > 0 && (
+              <div className="sm:hidden">
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>More</DropdownMenuLabel>
+                {morePages.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <DropdownMenuItem
+                      key={item.to}
+                      onSelect={() => navigate(item.to)}
+                    >
+                      <Icon />
+                      {item.label}
+                    </DropdownMenuItem>
+                  );
+                })}
+              </div>
+            )}
 
             {hasRole(Role.OWNER, Role.MANAGER) && (
               <>
@@ -638,70 +655,91 @@ const NavPill = React.forwardRef<
   );
 });
 
+/** A tab icon's filled twin, made once so React sees a stable component. */
+function filled(Icon: NavIcon): React.FC<{ className?: string }> {
+  const Filled = (props: { className?: string }) => (
+    <Icon weight="fill" {...props} />
+  );
+  Filled.displayName = `${Icon.displayName ?? 'Icon'}Filled`;
+  return Filled;
+}
+
+const MANAGEMENT: Role[] = [Role.OWNER, Role.MANAGER];
+
+/**
+ * The phone tab bar, in order. Owners and managers get Home and Reports;
+ * the front desk, whose home screen IS Check-in, gets that instead. Pages
+ * without a tab are one tap away in the account menu's "More" section.
+ */
+const MOBILE_TABS = [
+  { to: '/dashboard', label: 'Dashboard', shortLabel: 'Home', icon: SquaresFour, roles: MANAGEMENT },
+  { to: '/check-in', label: 'Check-in', icon: QrCode, roles: [Role.RECEPTIONIST, Role.TRAINER] },
+  { to: '/members', label: 'Members', icon: UsersThree },
+  { to: '/payments', label: 'Payments', icon: Wallet },
+  { to: '/messages', label: 'Messages', icon: ChatCircleDots },
+  { to: '/reports', label: 'Reports', icon: ChartLineUp, roles: MANAGEMENT },
+].map((tab) => ({ ...tab, activeIcon: filled(tab.icon) }));
+
+function mobileTabsFor(role: Role | undefined) {
+  return MOBILE_TABS.filter((tab) => !tab.roles || (role && tab.roles.includes(role)));
+}
+
 /**
  * Mobile bottom bar.
  *
  * Below `sm` the top pill keeps brand, search, new and account, while primary
  * navigation moves to the bottom of the screen — within thumb reach, which is
  * where a receptionist standing at the desk actually needs it.
+ *
+ * It IS the dashboard filter's SegmentedControl: the same lozenge, the same
+ * spring, and it can be dragged across the tabs and released on one, so the
+ * whole app moves one way.
  */
 export function MobileNavBar() {
   const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
 
-  const items = NAV_ITEMS.filter(
-    (item) => !item.roles || (user && item.roles.includes(user.role)),
-  ).slice(0, 5);
+  const tabs = mobileTabsFor(user?.role);
+  // A member's profile still belongs to Members; Plans has no tab at all.
+  const current =
+    tabs.find(
+      (tab) =>
+        location.pathname === tab.to || location.pathname.startsWith(`${tab.to}/`),
+    )?.to ?? null;
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center px-3 pb-3 sm:hidden">
-      <AnimatePresence>
-        <motion.nav
-          className="glass pointer-events-auto flex items-center gap-0.5 rounded-full p-1.5 shadow-pill"
-          initial={{ y: 30, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-          aria-label="Primary navigation"
-        >
-          {items.map((item) => {
-            const Icon = item.icon;
-            return (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                className={({ isActive }) =>
-                  cn(
-                    'relative flex size-11 items-center justify-center rounded-full transition-colors',
-                    isActive
-                      ? 'text-primary-foreground'
-                      : 'text-nav-foreground',
-                  )
-                }
-                aria-label={item.label}
-              >
-                {({ isActive }) => (
-                  <>
-                    {isActive && (
-                      <motion.span
-                        layoutId="mobile-nav-active"
-                        className="absolute inset-0 rounded-full bg-primary"
-                        transition={{
-                          type: 'spring',
-                          stiffness: 380,
-                          damping: 32,
-                        }}
-                      />
-                    )}
-                    <Icon
-                      weight={isActive ? 'fill' : 'regular'}
-                      className="relative z-10 size-5"
-                    />
-                  </>
-                )}
-              </NavLink>
-            );
-          })}
-        </motion.nav>
-      </AnimatePresence>
+    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:hidden">
+      <motion.nav
+        className="pointer-events-auto"
+        initial={{ y: 30, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+        aria-label="Primary navigation"
+      >
+        <SegmentedControl
+          size="tab"
+          ariaLabel="Main sections"
+          className="glass gap-0.5 p-1.5 shadow-pill"
+          value={current}
+          onChange={(to) => navigate(to)}
+          options={tabs.map((tab) => ({
+            value: tab.to,
+            label: tab.label,
+            shortLabel: tab.shortLabel,
+            icon: tab.icon,
+            activeIcon: tab.activeIcon,
+          }))}
+        />
+      </motion.nav>
     </div>
+  );
+}
+
+/** Pages a role can open that have no tab in the phone bar. */
+function morePagesFor(role: Role | undefined): NavItem[] {
+  const tabbed = new Set(mobileTabsFor(role).map((tab) => tab.to));
+  return NAV_ITEMS.filter(
+    (item) => (!item.roles || (role && item.roles.includes(role))) && !tabbed.has(item.to),
   );
 }
