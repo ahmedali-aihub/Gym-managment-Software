@@ -167,6 +167,8 @@ export function ReportsPage() {
   // 'today' and a short week widen to 14 days on the server so the chart has
   // a shape to read; the caption says so rather than mislabelling the window.
   const chartsWidened = period === 'today' || period === 'week';
+  // All time has no earlier period, so "0 previously" there says nothing.
+  const compare = period !== 'all';
   // The server buckets by day for short windows; the title must not claim
   // months when the bars are days.
   const bucketUnit =
@@ -220,8 +222,9 @@ export function ReportsPage() {
         />
       </div>
 
-      {/* Headline figures — period-scoped, so the label says which period. */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Headline figures — period-scoped, so the label says which period.
+          Two across on a phone, like the dashboard. */}
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <Metric
           icon={IndianRupee}
           label={`Collected · ${figures?.period.label ?? ''}`}
@@ -242,7 +245,9 @@ export function ReportsPage() {
           label="New members"
           value={figures ? String(figures.newMembers.current) : undefined}
           hint={
-            figures ? `${figures.newMembers.previous} previously` : undefined
+            figures && compare
+              ? `${figures.newMembers.previous} previously`
+              : undefined
           }
           loading={figuresLoading}
         />
@@ -250,7 +255,11 @@ export function ReportsPage() {
           icon={Activity}
           label="Renewals"
           value={figures ? String(figures.renewals.current) : undefined}
-          hint={figures ? `${figures.renewals.previous} previously` : undefined}
+          hint={
+            figures && compare
+              ? `${figures.renewals.previous} previously`
+              : undefined
+          }
           tone="success"
           loading={figuresLoading}
         />
@@ -272,7 +281,7 @@ export function ReportsPage() {
 
       {/* Business totals — NOT period-scoped. Separated from the row above
           so a period filter never looks like it is filtering them. */}
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
         <Metric
           icon={Users}
           label="Total members"
@@ -421,23 +430,28 @@ function Metric({
   } as const;
 
   return (
-    <Card className="p-4">
-      <div className="flex items-center gap-2">
-        <Icon className="size-3.5 text-muted-foreground" />
-        <p className="text-[12px] text-muted-foreground">{label}</p>
+    <Card className="min-w-0 p-3 sm:p-4">
+      <div className="flex min-w-0 items-center gap-2">
+        {/* A third of a phone has room for the words or the icon, not both. */}
+        <Icon className="hidden size-3.5 shrink-0 text-muted-foreground sm:block" />
+        <p className="truncate text-[11px] text-muted-foreground sm:text-[12px]">
+          {label}
+        </p>
       </div>
       {value !== undefined && !loading ? (
         <>
           <p
             className={cn(
-              'tabular mt-2 font-display text-2xl font-semibold tracking-tight',
+              'tabular mt-1.5 font-display text-xl font-semibold tracking-tight sm:mt-2 sm:text-2xl',
               toneStyles[tone],
             )}
           >
             {value}
           </p>
           {hint && (
-            <p className="mt-0.5 text-[11px] text-muted-foreground">{hint}</p>
+            <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+              {hint}
+            </p>
           )}
         </>
       ) : (

@@ -234,8 +234,10 @@ export function PaymentsPage() {
       </div>
 
       {/* Totals */}
+      {/* Three across even on a phone: three short figures stacked full
+          width were a screen of scrolling before the first payment. */}
       {canSeeTotals && (
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-3 gap-2 sm:gap-4">
           <SummaryCard
             label="Collected"
             value={stats ? formatINRCompact(stats.collectedPaise) : undefined}
@@ -414,19 +416,21 @@ function SummaryCard({
   } as const;
 
   return (
-    <Card className="p-4">
-      <p className="text-[12px] text-muted-foreground">{label}</p>
+    <Card className="min-w-0 p-3 sm:p-4">
+      <p className="truncate text-[11px] text-muted-foreground sm:text-[12px]">
+        {label}
+      </p>
       {value ? (
         <p
           className={cn(
-            'tabular mt-1.5 font-display text-2xl font-semibold tracking-tight',
+            'tabular mt-1 font-display text-lg font-semibold tracking-tight sm:mt-1.5 sm:text-2xl',
             toneStyles[tone],
           )}
         >
           {value}
         </p>
       ) : (
-        <Skeleton className="mt-2 h-7 w-24" />
+        <Skeleton className="mt-2 h-6 w-14 sm:h-7 sm:w-24" />
       )}
     </Card>
   );

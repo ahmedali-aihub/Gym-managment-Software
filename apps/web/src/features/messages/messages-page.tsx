@@ -205,7 +205,7 @@ export function MessagesPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <StatCard label="Sent" value={stats?.total} />
         <StatCard label="Delivered" value={stats?.delivered} tone="success" />
         <StatCard label="Needs attention" value={failedCount} tone="destructive" />
@@ -478,7 +478,7 @@ function StatCard({
       ) : (
         <p
           className={cn(
-            'tabular mt-1.5 font-display text-2xl font-semibold tracking-tight',
+            'tabular mt-1.5 font-display text-xl font-semibold tracking-tight sm:text-2xl',
             toneStyles[tone],
           )}
         >
