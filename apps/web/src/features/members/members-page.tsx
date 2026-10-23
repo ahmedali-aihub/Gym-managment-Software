@@ -175,7 +175,10 @@ export function MembersPage() {
       // Active default" — toggling Expired off should not land on Active.
       else if (key === 'status') next.set('status', 'all');
       else next.delete(key);
-      next.delete('page');
+      // A new filter starts again from page 1, but paging itself goes
+      // through here too: deleting unconditionally undid every Next and
+      // Previous, so the list never left its first page.
+      if (key !== 'page') next.delete('page');
       return next;
     });
   }

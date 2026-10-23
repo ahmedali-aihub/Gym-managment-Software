@@ -118,7 +118,8 @@ export function PaymentsPage() {
       const next = new URLSearchParams(current);
       if (value) next.set(key, value);
       else next.delete(key);
-      next.delete('page');
+      // Paging goes through here as well; see the Members page.
+      if (key !== 'page') next.delete('page');
       return next;
     });
   }
