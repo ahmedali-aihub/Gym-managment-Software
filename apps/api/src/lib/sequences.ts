@@ -134,47 +134,6 @@ export async function nextReceiptNumber(
 }
 
 /**
- * Give back document numbers whose documents an undo has just removed.
- *
- * Only from the TOP of the counter: RCPT/2026-27/0007 is released only while
- * 0007 is still the last number issued that year. Once 0008 exists, lowering
- * the counter would hand out 0008 twice, so the removed number stays a gap —
- * a visible gap is an accounting question, a duplicate is an error.
- *
- * The check and the decrement are one conditional UPDATE, so a receipt
- * issued concurrently cannot slip between them. Returns the numbers that
- * were released. MUST run inside the transaction that deleted the documents.
- */
-export async function releaseDocumentNumbers(
-  tx: Prisma.TransactionClient,
-  numbers: string[],
-): Promise<string[]> {
-  const parsed = numbers
-    .map((number) => {
-      const match = /^[A-Z]+\/(\d{4}-\d{2})\/(\d+)$/.exec(number);
-      return match
-        ? { number, financialYear: match[1]!, sequence: Number(match[2]) }
-        : null;
-    })
-    .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
-    // Highest first, so two removed receipts at the top both come back.
-    .sort((a, b) => b.sequence - a.sequence);
-
-  const released: string[] = [];
-  for (const entry of parsed) {
-    const updated = await tx.$executeRaw`
-      UPDATE invoice_sequences
-      SET "lastSequence" = "lastSequence" - 1,
-          "updatedAt" = NOW()
-      WHERE "financialYear" = ${entry.financialYear}
-        AND "lastSequence" = ${entry.sequence}
-    `;
-    if (updated === 1) released.push(entry.number);
-  }
-  return released;
-}
-
-/**
  * Document number appropriate to the current tax registration:
  * a tax invoice when GST-registered, a plain receipt otherwise.
  */

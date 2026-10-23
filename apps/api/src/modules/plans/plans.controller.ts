@@ -8,7 +8,6 @@ import type {
 } from '@azf/shared';
 import type { Request, Response } from 'express';
 import { requireUser } from '../../middleware/auth.middleware.js';
-import { actorFromRequest } from '../../services/audit/audit.service.js';
 import { membershipsService } from './memberships.service.js';
 import { plansService, type PlanQueryParams } from './plans.service.js';
 
@@ -116,15 +115,6 @@ export const membershipsController = {
       actor.sub,
     );
     res.status(201).json({ success: true, data: membership });
-  },
-
-  async undoRenewal(req: Request, res: Response): Promise<void> {
-    requireUser(req);
-    const result = await membershipsService.undoRenewal(
-      req.params.id as string,
-      actorFromRequest(req),
-    );
-    res.json({ success: true, data: result });
   },
 
   async expiring(req: Request, res: Response): Promise<void> {
