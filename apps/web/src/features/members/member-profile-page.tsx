@@ -243,33 +243,38 @@ export function MemberProfilePage() {
         >
           <Card>
             <CardContent className="pt-6">
-              <div className="flex flex-col items-center text-center">
+              {/* Side by side until the sidebar column appears at lg: centred
+                  on a phone, the photo alone took a third of the screen. */}
+              <div className="flex items-center gap-4 lg:flex-col lg:gap-0 lg:text-center">
                 <MemberAvatar
                   name={data.fullName}
                   photoUrl={data.photoUrl}
-                  className="size-20"
+                  className="size-16 shrink-0 lg:size-20"
                 />
 
-                <h2 className="mt-3 font-display text-lg font-semibold tracking-tight">
-                  {data.fullName}
-                </h2>
+                <div className="min-w-0 lg:mt-3 lg:flex lg:flex-col lg:items-center">
+                  <h2 className="font-display text-lg font-semibold tracking-tight">
+                    {data.fullName}
+                  </h2>
 
-                <p className="tabular mt-0.5 font-mono text-[13px] text-muted-foreground">
-                  {data.memberId}
-                </p>
+                  <p className="tabular mt-0.5 font-mono text-[13px] text-muted-foreground">
+                    {data.memberId}
+                  </p>
 
-                <Badge
-                  variant={STATUS_VARIANTS[data.status]}
-                  dot
-                  className="mt-2.5"
-                >
-                  {MEMBER_STATUS_LABELS[data.status]}
-                </Badge>
+                  <Badge
+                    variant={STATUS_VARIANTS[data.status]}
+                    dot
+                    className="mt-2 lg:mt-2.5"
+                  >
+                    {MEMBER_STATUS_LABELS[data.status]}
+                  </Badge>
+                </div>
               </div>
 
-              <Separator className="my-5" />
+              <Separator className="my-4 lg:my-5" />
 
-              <dl className="space-y-3 text-[13px]">
+              {/* Two columns on a phone; the long values take a full row. */}
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-[13px] lg:grid-cols-1">
                 <InfoRow icon={Phone} label="Phone">
                   <a
                     href={`tel:+91${data.phone}`}
@@ -280,7 +285,11 @@ export function MemberProfilePage() {
                 </InfoRow>
 
                 {data.email && (
-                  <InfoRow icon={Mail} label="Email">
+                  <InfoRow
+                    icon={Mail}
+                    label="Email"
+                    className="col-span-2 lg:col-span-1"
+                  >
                     <span className="break-all">{data.email}</span>
                   </InfoRow>
                 )}
@@ -298,7 +307,11 @@ export function MemberProfilePage() {
                 </InfoRow>
 
                 {data.addressLine1 && (
-                  <InfoRow icon={MapPin} label="Address">
+                  <InfoRow
+                    icon={MapPin}
+                    label="Address"
+                    className="col-span-2 lg:col-span-1"
+                  >
                     {data.addressLine1}
                     {data.pincode ? `, ${data.pincode}` : ''}
                   </InfoRow>
@@ -350,8 +363,9 @@ export function MemberProfilePage() {
         {/* ── Main column ─────────────────────────────────────────────── */}
         <div className="space-y-5 lg:col-span-2">
           {/* Status strip */}
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
             <StatCard
+              className="col-span-2 sm:col-span-1"
               label="Current plan"
               value={currentMembership?.plan.name ?? 'None'}
               sub={
@@ -387,8 +401,9 @@ export function MemberProfilePage() {
             />
           </div>
 
-          {/* Actions */}
-          <div className="flex flex-wrap gap-2">
+          {/* Actions. An even two-column grid on a phone; wrapping freely,
+              five buttons of different widths left a ragged third row. */}
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
             <Button
               size="sm"
               onClick={() => setPaymentOpen(true)}
@@ -431,7 +446,10 @@ export function MemberProfilePage() {
                 }
               >
                 <WhatsappLogo weight="fill" className="text-[#25D366]" />
-                Welcome on WhatsApp
+                {/* The logo says where it goes; half a phone has no room
+                    for the words as well. */}
+                <span className="sm:hidden">Welcome</span>
+                <span className="hidden sm:inline">Welcome on WhatsApp</span>
               </Button>
             )}
 
@@ -468,16 +486,18 @@ export function MemberProfilePage() {
 
           {/* Tabs */}
           <Tabs defaultValue="payments">
-            <TabsList className="max-w-full justify-start overflow-x-auto">
-              <TabsTrigger value="payments">
+            {/* Text only on a phone, so every tab fits without the last
+                one hiding off the edge. */}
+            <TabsList className="flex w-full justify-start overflow-x-auto sm:inline-flex sm:w-auto sm:max-w-full">
+              <TabsTrigger value="payments" className={PROFILE_TAB}>
                 <Receipt />
                 Payments
               </TabsTrigger>
-              <TabsTrigger value="attendance">
+              <TabsTrigger value="attendance" className={PROFILE_TAB}>
                 <CalendarDays />
                 Attendance
               </TabsTrigger>
-              <TabsTrigger value="pass">
+              <TabsTrigger value="pass" className={PROFILE_TAB}>
                 <QrCode />
                 QR pass
               </TabsTrigger>
@@ -485,7 +505,7 @@ export function MemberProfilePage() {
                   while serving a queue — and the API refuses it for other
                   roles, so showing the tab would only produce an error. */}
               {canSeeHistory && (
-                <TabsTrigger value="history">
+                <TabsTrigger value="history" className={PROFILE_TAB}>
                   <History />
                   History
                 </TabsTrigger>
@@ -506,9 +526,9 @@ export function MemberProfilePage() {
                     {data.payments.map((payment) => (
                       <div
                         key={payment.id}
-                        className="flex items-center gap-3 px-5 py-3.5"
+                        className="flex items-center gap-3 px-4 py-3.5 sm:px-5"
                       >
-                        <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-success/10">
+                        <div className="hidden size-9 shrink-0 items-center justify-center rounded-full bg-success/10 sm:flex">
                           <Receipt className="size-4 text-success" />
                         </div>
 
@@ -522,23 +542,35 @@ export function MemberProfilePage() {
                               </span>
                             )}
                           </div>
-                          <div className="text-xs text-muted-foreground">
-                            {formatDateTime(payment.paidAt)}
+                          {/* On a phone the receipt links get their own line:
+                              squeezed in after the date they wrapped mid-row
+                              and made small targets for a thumb. */}
+                          <div className="text-xs text-muted-foreground sm:flex sm:flex-wrap sm:items-center sm:gap-x-1.5">
+                            <span className="tabular">
+                              {formatDateTime(payment.paidAt)}
+                            </span>
                             {payment.invoice && (
-                              <>
-                                {' · '}
+                              <span className="mt-1 flex items-center gap-4 sm:contents">
+                                <span aria-hidden className="hidden sm:inline">
+                                  ·
+                                </span>
                                 <button
                                   type="button"
                                   onClick={() =>
                                     void openReceipt(payment.invoice!.id)
                                   }
-                                  className="underline underline-offset-2 transition-colors hover:text-primary"
+                                  className="py-0.5 underline underline-offset-2 transition-colors hover:text-primary"
                                 >
                                   Receipt
                                 </button>
                                 {canEdit && (
                                   <>
-                                    {' · '}
+                                    <span
+                                      aria-hidden
+                                      className="hidden sm:inline"
+                                    >
+                                      ·
+                                    </span>
                                     <button
                                       type="button"
                                       disabled={whatsapp.sending}
@@ -556,13 +588,13 @@ export function MemberProfilePage() {
                                           },
                                         )
                                       }
-                                      className="underline underline-offset-2 transition-colors hover:text-[#25D366] disabled:opacity-50"
+                                      className="py-0.5 underline underline-offset-2 transition-colors hover:text-[#25D366] disabled:opacity-50"
                                     >
                                       WhatsApp
                                     </button>
                                   </>
                                 )}
-                              </>
+                              </span>
                             )}
                           </div>
                         </div>
@@ -765,17 +797,23 @@ export function MemberProfilePage() {
   );
 }
 
+/** Profile tabs share a phone's width evenly and drop their icons there. */
+const PROFILE_TAB =
+  'flex-1 px-2 sm:flex-none sm:px-4 [&_svg]:hidden sm:[&_svg]:block';
+
 function InfoRow({
   icon: Icon,
   label,
   children,
+  className,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   children: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="flex items-start gap-2.5">
+    <div className={cn('flex min-w-0 items-start gap-2.5', className)}>
       <Icon className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
       <div className="min-w-0 flex-1">
         <dt className="sr-only">{label}</dt>
@@ -790,11 +828,13 @@ function StatCard({
   value,
   sub,
   tone = 'default',
+  className,
 }: {
   label: string;
   value: string;
   sub: string;
   tone?: 'default' | 'success' | 'warning' | 'destructive';
+  className?: string;
 }) {
   const toneStyles = {
     default: 'text-foreground',
@@ -804,7 +844,7 @@ function StatCard({
   } as const;
 
   return (
-    <Card className="p-4">
+    <Card className={cn('p-4', className)}>
       <p className="text-[12px] text-muted-foreground">{label}</p>
       <p
         className={cn(
@@ -825,8 +865,8 @@ function ProfileSkeleton() {
       <Skeleton className="h-8 w-48" />
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <Card className="p-6">
-          <div className="flex flex-col items-center gap-3">
-            <Skeleton className="size-20 rounded-full" />
+          <div className="flex items-center gap-3 lg:flex-col">
+            <Skeleton className="size-16 shrink-0 rounded-full lg:size-20" />
             <Skeleton className="h-5 w-36" />
             <Skeleton className="h-4 w-24" />
           </div>
@@ -838,9 +878,15 @@ function ProfileSkeleton() {
         </Card>
 
         <div className="space-y-5 lg:col-span-2">
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
             {Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} className="h-24 rounded-2xl" />
+              <Skeleton
+                key={i}
+                className={cn(
+                  'h-24 rounded-2xl',
+                  i === 0 && 'col-span-2 sm:col-span-1',
+                )}
+              />
             ))}
           </div>
           <Skeleton className="h-11 w-64 rounded-xl" />
