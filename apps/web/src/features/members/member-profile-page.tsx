@@ -713,6 +713,7 @@ export function MemberProfilePage() {
         onOpenChange={setPaymentOpen}
         member={data}
         balanceDuePaise={data.balance.balanceDuePaise}
+        onWhatsAppOpened={whatsapp.setState}
       />
 
       <NotifyDialog

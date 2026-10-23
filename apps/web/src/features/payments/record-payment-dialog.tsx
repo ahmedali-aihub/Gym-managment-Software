@@ -23,8 +23,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import type { WhatsAppSendState } from '@/components/common/whatsapp-send-dialog';
 import { api, getErrorMessage } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
+import { openWhatsApp, type WhatsAppMessage } from '@/lib/whatsapp';
 
 interface RecordPaymentDialogProps {
   open: boolean;
@@ -35,6 +37,8 @@ interface RecordPaymentDialogProps {
     fullName: string;
   };
   balanceDuePaise: number;
+  /** Told what WhatsApp was opened with, so the page can show the send dialog. */
+  onWhatsAppOpened?: (state: WhatsAppSendState) => void;
 }
 
 interface PaymentForm {
@@ -58,6 +62,7 @@ export function RecordPaymentDialog({
   onOpenChange,
   member,
   balanceDuePaise,
+  onWhatsAppOpened,
 }: RecordPaymentDialogProps) {
   const queryClient = useQueryClient();
 
@@ -107,7 +112,12 @@ export function RecordPaymentDialog({
   const mutation = useMutation({
     mutationFn: async (values: PaymentForm) => {
       const response = await api.post<{
-        data: { payment: { id: string }; balance: { balanceDuePaise: number } };
+        data: {
+          payment: { id: string };
+          balance: { balanceDuePaise: number };
+          /** The receipt message, ready to send from the desk's WhatsApp. */
+          whatsapp: WhatsAppMessage | null;
+        };
       }>('/payments', {
         memberId: member.id,
         amountPaise: rupeesToPaise(Number(values.amountRupees) || 0),
@@ -129,14 +139,31 @@ export function RecordPaymentDialog({
       void queryClient.invalidateQueries({ queryKey: ['members'] });
       void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
 
+      // WhatsApp opens with the receipt from here, while the browser still
+      // counts this as part of the Record click.
+      const opened = data.whatsapp ? openWhatsApp(data.whatsapp) : false;
+
       toast.success('Payment recorded', {
-        description:
+        description: [
           data.balance.balanceDuePaise > 0
             ? `${formatINR(data.balance.balanceDuePaise, { showDecimals: false })} still outstanding.`
             : 'This member is now fully paid up.',
+          opened && 'WhatsApp is open with the receipt — press Send.',
+        ]
+          .filter(Boolean)
+          .join(' '),
       });
 
       onOpenChange(false);
+
+      if (data.whatsapp) {
+        onWhatsAppOpened?.({
+          title: 'Payment receipt',
+          recipient: member.fullName,
+          message: data.whatsapp,
+          opened,
+        });
+      }
     },
 
     onError: (error) => toast.error(getErrorMessage(error)),
