@@ -1,8 +1,47 @@
-# Connecting WhatsApp
+# WhatsApp
 
-Until this is done, the app **does not send any WhatsApp messages**. The live
-site uses the "mock" WhatsApp provider, which only writes messages to the log.
-Email already works.
+## How it works today (free, nothing to set up)
+
+The desk sends WhatsApp messages from **its own WhatsApp**: the app opens
+the member's chat with the message already typed, and you press **Send**.
+
+| When | Email (automatic) | WhatsApp (you press Send) |
+|---|---|---|
+| A member is registered | Welcome, with the receipt PDF attached | Welcome, with a link to the receipt |
+| A payment is recorded | Receipt PDF | Thank-you, with a link to the receipt |
+| **Send reminder** on a profile | Reminder | Renewal or dues reminder |
+
+The profile also has **Welcome on WhatsApp**, and a **WhatsApp** link beside
+every receipt, to send them again.
+
+On a computer, choose **WhatsApp Web** or the **WhatsApp app** in the
+dialog that appears; the choice is remembered. WhatsApp Web must be signed
+in (scan its QR code once with the gym phone).
+
+**Why a link and not an attached PDF:** WhatsApp does not let any website
+attach a file to a message it opens. The link opens the member's own
+receipt; it is signed, so it cannot be guessed or changed to open someone
+else's.
+
+**Two limits of this method:** someone has to press Send, and reminders to
+many members at once cannot be sent this way (the bulk reminder sends
+email only). For fully automatic messages with the PDF attached, and bulk
+WhatsApp, connect WhatsApp Business as described below. Once connected, the
+app sends everything itself and stops opening WhatsApp for the desk.
+
+**Optional:** set `RECEIPT_LINK_SECRET` in Vercel to a random string of 32+
+characters. Receipt links are signed with it; without it they are signed
+with a key derived from `JWT_REFRESH_SECRET`, so changing that secret would
+break links already sent.
+
+---
+
+# Connecting WhatsApp Business (optional, for automatic sending)
+
+The app talks to WhatsApp through Meta's official **WhatsApp Cloud API**.
+There is no monthly fee from Meta, only a small charge per message (about
+₹0.14 with GST for these messages); see
+[Meta's pricing page](https://developers.facebook.com/docs/whatsapp/pricing).
 
 Once connected, each new member automatically gets, straight after
 registration:
@@ -12,10 +51,6 @@ registration:
 - the **email** welcome with the same receipt PDF (if they gave an email).
 
 Every payment recorded later also sends the receipt PDF on WhatsApp.
-
-The app talks to WhatsApp through Meta's official **WhatsApp Cloud API**.
-There is no monthly fee from Meta, only a small charge per message; see
-[Meta's pricing page](https://developers.facebook.com/docs/whatsapp/pricing).
 
 ---
 
