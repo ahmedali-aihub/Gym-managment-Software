@@ -4,6 +4,7 @@ import type {
   RefundPaymentInput,
 } from '@azf/shared';
 import type { Request, Response } from 'express';
+import { whatsappConfig } from '../../config/env.js';
 import { requireUser } from '../../middleware/auth.middleware.js';
 import {
   chatMessageOrNull,
@@ -19,11 +20,14 @@ export const paymentsController = {
       actor.sub,
     );
 
-    // The receipt message, ready for the desk to send from its WhatsApp.
-    const whatsapp = await chatMessageOrNull(
-      chatMessageService.receiptForPayment(result.payment.id),
-      { paymentId: result.payment.id },
-    );
+    // The receipt message, ready for the desk to send from its WhatsApp —
+    // unless Meta is connected and the app has already sent it.
+    const whatsapp = whatsappConfig.live
+      ? null
+      : await chatMessageOrNull(
+          chatMessageService.receiptForPayment(result.payment.id),
+          { paymentId: result.payment.id },
+        );
 
     res.status(201).json({
       success: true,

@@ -4,6 +4,7 @@ import type {
   UpdateMemberInput,
 } from '@azf/shared';
 import type { Request, Response } from 'express';
+import { whatsappConfig } from '../../config/env.js';
 import { ConflictError } from '../../lib/errors.js';
 import { requireUser } from '../../middleware/auth.middleware.js';
 import {
@@ -41,11 +42,13 @@ export const membersController = {
     );
 
     // The welcome, ready for the desk to send from its own WhatsApp — handed
-    // back here so the browser can open the chat straight away.
-    const whatsapp = await chatMessageOrNull(
-      chatMessageService.welcome(result.member.id),
-      { memberId: result.member.memberId },
-    );
+    // back here so the browser can open the chat straight away. Not once
+    // Meta is connected: the app has already sent it.
+    const whatsapp = whatsappConfig.live
+      ? null
+      : await chatMessageOrNull(chatMessageService.welcome(result.member.id), {
+          memberId: result.member.memberId,
+        });
 
     res.status(201).json({
       success: true,

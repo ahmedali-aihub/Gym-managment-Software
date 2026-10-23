@@ -5,7 +5,7 @@ import {
   formatDate,
   paiseToRupees,
 } from '@azf/shared';
-import { gymConfig } from '../../config/env.js';
+import { gymConfig, whatsappConfig } from '../../config/env.js';
 import { prisma } from '../../lib/prisma.js';
 import { moduleLogger } from '../../lib/logger.js';
 import { emailService } from '../../services/email/email.service.js';
@@ -86,7 +86,11 @@ class NotificationsService {
         : 0;
 
       // ── WhatsApp ───────────────────────────────────────────────────
-      if (params.channels.includes('whatsapp')) {
+      // Without Meta connected nothing would reach the member, so report it
+      // as skipped rather than letting the mock record a false "sent".
+      if (params.channels.includes('whatsapp') && !whatsappConfig.automatic) {
+        result.whatsapp = 'skipped';
+      } else if (params.channels.includes('whatsapp')) {
         try {
           await whatsappService.send({
             to: member.phone,

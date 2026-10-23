@@ -20,6 +20,7 @@ import type { Payment, Prisma } from '@prisma/client';
 import { issueReceipt } from '../invoices/receipt-issuer.js';
 import { emailService } from '../../services/email/email.service.js';
 import { whatsappService } from '../../services/whatsapp/whatsapp.service.js';
+import { whatsappConfig } from '../../config/env.js';
 import { runInBackground } from '../../lib/background.js';
 import {
   InvalidStateError,
@@ -156,19 +157,22 @@ class PaymentsService {
       );
     }
 
-    // WhatsApp confirmation — the channel most members read. Always sent,
-    // because every member has a mobile number.
-    runInBackground(
-      this.sendReceiptWhatsApp(
-        member.id,
-        member.phone,
-        member.fullName,
-        member.memberId,
-        payment,
-        balance,
-      ),
-      'receipt WhatsApp',
-    );
+    // WhatsApp confirmation — the channel most members read. Sent by the app
+    // only once Meta is connected; until then the desk sends it from its own
+    // WhatsApp, with the text the payment response carries.
+    if (whatsappConfig.automatic) {
+      runInBackground(
+        this.sendReceiptWhatsApp(
+          member.id,
+          member.phone,
+          member.fullName,
+          member.memberId,
+          payment,
+          balance,
+        ),
+        'receipt WhatsApp',
+      );
+    }
 
     // The receipt PDF, emailed to the member. Sent whenever they gave an
     // address and with no per-payment toggle: email costs nothing, needs no

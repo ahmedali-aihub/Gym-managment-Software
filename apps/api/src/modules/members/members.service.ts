@@ -20,7 +20,7 @@ import {
   paiseToRupees,
 } from '@azf/shared';
 import type { Member, Prisma } from '@prisma/client';
-import { gymConfig } from '../../config/env.js';
+import { gymConfig, whatsappConfig } from '../../config/env.js';
 import { runInBackground } from '../../lib/background.js';
 import { InvalidStateError, NotFoundError } from '../../lib/errors.js';
 import { moduleLogger } from '../../lib/logger.js';
@@ -275,22 +275,25 @@ class MembersService {
       // Welcome email — sent whenever the member gave an address, with no
       // per-registration toggle. Unlike SMS it costs nothing and needs no
       // DLT approval, so there is no reason to make the desk decide.
-      // WhatsApp — the channel most members actually read. Sent whenever we
-      // have a mobile number, which is every member: phone is required.
-      runInBackground(
-        this.sendWelcomeWhatsApp({
-          memberDbId: result.member.id,
-          memberId: result.member.memberId,
-          fullName: result.member.fullName,
-          phone: result.member.phone,
-          planName: plan.name,
-          endDate: result.membership.endDate,
-          amountPaidPaise: input.payment.amountPaid,
-          invoiceId: result.invoiceId,
-          sentById: createdById,
-        }),
-        'welcome WhatsApp',
-      );
+      // WhatsApp — the channel most members actually read. Sent by the app
+      // only once Meta is connected; until then the desk sends the welcome
+      // from its own WhatsApp (the registration response carries the text).
+      if (whatsappConfig.automatic) {
+        runInBackground(
+          this.sendWelcomeWhatsApp({
+            memberDbId: result.member.id,
+            memberId: result.member.memberId,
+            fullName: result.member.fullName,
+            phone: result.member.phone,
+            planName: plan.name,
+            endDate: result.membership.endDate,
+            amountPaidPaise: input.payment.amountPaid,
+            invoiceId: result.invoiceId,
+            sentById: createdById,
+          }),
+          'welcome WhatsApp',
+        );
+      }
 
       if (result.member.email) {
         runInBackground(

@@ -361,6 +361,19 @@ export const emailConfig = {
 export const whatsappConfig = {
   provider: env.WHATSAPP_PROVIDER,
   enabled: env.WHATSAPP_ENABLED,
+  /**
+   * Meta is connected, so the app sends WhatsApp itself — and the desk's
+   * click-to-send prompt steps aside, or members would get everything twice.
+   */
+  live: env.WHATSAPP_PROVIDER === 'meta' && env.WHATSAPP_ENABLED,
+  /**
+   * Whether the app sends WhatsApp in the background at all: when live, and
+   * in development, where the mock keeps those paths exercised. Never the
+   * mock in production — it would record "sent" for messages nobody gets,
+   * while the desk sends the real ones from its own WhatsApp.
+   */
+  automatic:
+    (env.WHATSAPP_PROVIDER === 'meta' && env.WHATSAPP_ENABLED) || !isProduction,
   maxRetries: env.WHATSAPP_MAX_RETRIES,
   retryBackoffMs: env.WHATSAPP_RETRY_BACKOFF_MS,
   languageCode: env.WHATSAPP_LANGUAGE,
