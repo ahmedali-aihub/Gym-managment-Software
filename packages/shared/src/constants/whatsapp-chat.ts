@@ -14,11 +14,8 @@ import { toE164 } from './identifiers.js';
  * letterhead, a formal greeting, one labelled fact per line, and a signed
  * close. WhatsApp renders *text* bold and _text_ italic.
  *
- * Each fact line leads with one emoji that names it — a receipt, a calendar,
- * a card — so the eye finds "how much" and "until when" without reading
- * every label. They are all single-code-point emoji, which every WhatsApp
- * build draws the same way; the ones that need a variation selector (🗓️,
- * 🏋️) can arrive as plain symbols on older phones.
+ * No emoji: they read as casual, and a receipt or reminder from a business
+ * should look like one. Bold labels carry the structure instead.
  *
  * Lines for values that do not apply are left out entirely rather than shown
  * blank.
@@ -43,12 +40,12 @@ function signOff(v: Signature, contactLine?: string): string[] {
   const lines: string[] = [];
   if (contactLine) lines.push(contactLine, '');
   lines.push('Warm regards,', `*Team ${v.gymName}*`);
-  if (v.gymLocation) lines.push(`📍 ${v.gymLocation}`);
+  if (v.gymLocation) lines.push(v.gymLocation);
   return lines;
 }
 
 const callUs = (phone: string | undefined, fallback?: string) =>
-  phone ? `📞 For any assistance, call us on ${phone}.` : fallback;
+  phone ? `For any assistance, call us on ${phone}.` : fallback;
 
 export interface WelcomeChatVariables extends Signature {
   /** First name. */
@@ -71,28 +68,28 @@ export function welcomeChatMessage(v: WelcomeChatVariables): string {
     ...letterhead(v.gymName, 'Membership Confirmation'),
     `Dear ${v.name},`,
     '',
-    `Welcome to *${v.gymName}*! 🎉 Your membership is now active, and we look forward to being part of your fitness journey.`,
+    `Welcome to *${v.gymName}*! Your membership is now active, and we look forward to being part of your fitness journey.`,
     '',
-    `🆔 *Member ID:* ${v.memberId}`,
-    `🏆 *Plan:* ${v.plan}`,
-    `📅 *Start Date:* ${v.validFrom}`,
-    `⏳ *Valid Till:* ${v.validUntil}`,
+    `*Member ID:* ${v.memberId}`,
+    `*Plan:* ${v.plan}`,
+    `*Start Date:* ${v.validFrom}`,
+    `*Valid Till:* ${v.validUntil}`,
   ];
 
   const payment: string[] = [];
   if (v.amountPaid) {
     payment.push(
-      `💰 *Amount Paid:* ₹${v.amountPaid}${v.paymentMode ? ` (${v.paymentMode})` : ''}`,
+      `*Amount Paid:* ₹${v.amountPaid}${v.paymentMode ? ` (${v.paymentMode})` : ''}`,
     );
   }
-  if (v.balanceDue) payment.push(`🔔 *Balance Due:* ₹${v.balanceDue}`);
+  if (v.balanceDue) payment.push(`*Balance Due:* ₹${v.balanceDue}`);
   if (v.receiptNumber && v.receiptUrl) {
-    payment.push(`🧾 *Receipt No:* ${v.receiptNumber}`);
+    payment.push(`*Receipt No:* ${v.receiptNumber}`);
   }
   if (payment.length > 0) lines.push('', ...payment);
 
   if (v.receiptUrl) {
-    lines.push('', '📄 *Download your receipt (PDF):*', v.receiptUrl);
+    lines.push('', '*Download your receipt (PDF):*', v.receiptUrl);
   }
 
   lines.push(
@@ -126,13 +123,13 @@ export function receiptChatMessage(v: ReceiptChatVariables): string {
     '',
     'Thank you for your payment. Here are the details for your records.',
     '',
-    `🧾 *Receipt No:* ${v.receiptNumber}`,
-    `📅 *Date:* ${v.paidOn}`,
-    `💳 *Payment Mode:* ${v.paymentMode}`,
-    `💰 *Amount Paid:* ₹${v.amount}`,
+    `*Receipt No:* ${v.receiptNumber}`,
+    `*Date:* ${v.paidOn}`,
+    `*Payment Mode:* ${v.paymentMode}`,
+    `*Amount Paid:* ₹${v.amount}`,
     v.balanceDue
-      ? `🔔 *Balance Due:* ₹${v.balanceDue}`
-      : '✅ *Balance Due:* Nil',
+      ? `*Balance Due:* ₹${v.balanceDue}`
+      : '*Balance Due:* Nil',
   ];
 
   if (v.balanceDue) {
@@ -140,13 +137,13 @@ export function receiptChatMessage(v: ReceiptChatVariables): string {
   }
 
   if (v.plan) {
-    lines.push('', `🏆 *Plan:* ${v.plan}`);
-    if (v.validUntil) lines.push(`⏳ *Valid Till:* ${v.validUntil}`);
+    lines.push('', `*Plan:* ${v.plan}`);
+    if (v.validUntil) lines.push(`*Valid Till:* ${v.validUntil}`);
   }
 
   lines.push(
     '',
-    '📄 *Download your receipt (PDF):*',
+    '*Download your receipt (PDF):*',
     v.receiptUrl,
     '',
     ...signOff(v, callUs(v.gymPhone)),
@@ -171,12 +168,12 @@ export interface ReminderChatVariables extends Signature {
 
 export function reminderChatMessage(v: ReminderChatVariables): string {
   if (v.kind === 'EXPIRY_REMINDER') {
-    const facts = [`🆔 *Member ID:* ${v.memberId}`];
-    if (v.plan) facts.push(`🏆 *Plan:* ${v.plan}`);
+    const facts = [`*Member ID:* ${v.memberId}`];
+    if (v.plan) facts.push(`*Plan:* ${v.plan}`);
     facts.push(
       v.expired
-        ? `⌛ *Expired On:* ${v.expiryDate}`
-        : `⏳ *Expires On:* ${v.expiryDate}`,
+        ? `*Expired On:* ${v.expiryDate}`
+        : `*Expires On:* ${v.expiryDate}`,
     );
 
     return [
@@ -190,14 +187,14 @@ export function reminderChatMessage(v: ReminderChatVariables): string {
       ...facts,
       '',
       v.expired
-        ? 'Renew today to get back to your training. 💪'
-        : 'Renew before the expiry date to keep training without a break. 💪',
+        ? 'Renew today to get back to your training.'
+        : 'Renew before the expiry date to keep training without a break.',
       '',
       ...signOff(
         v,
         v.gymPhone
-          ? `📞 To renew, call us on ${v.gymPhone} or simply reply to this message.`
-          : '💬 To renew, simply reply to this message.',
+          ? `To renew, call us on ${v.gymPhone} or simply reply to this message.`
+          : 'To renew, simply reply to this message.',
       ),
     ].join('\n');
   }
@@ -208,16 +205,16 @@ export function reminderChatMessage(v: ReminderChatVariables): string {
     '',
     `This is a gentle reminder that a balance is pending on your *${v.gymName}* membership.`,
     '',
-    `🆔 *Member ID:* ${v.memberId}`,
-    `🔔 *Balance Due:* ₹${v.balanceDue}`,
+    `*Member ID:* ${v.memberId}`,
+    `*Balance Due:* ₹${v.balanceDue}`,
     '',
-    'Kindly clear it at the front desk on your next visit. Thank you for your prompt attention. 🙏',
+    'Kindly clear it at the front desk on your next visit. Thank you for your prompt attention.',
     '',
     ...signOff(
       v,
       v.gymPhone
-        ? `📞 For any questions, call us on ${v.gymPhone} or reply to this message.`
-        : '💬 For any questions, simply reply to this message.',
+        ? `For any questions, call us on ${v.gymPhone} or reply to this message.`
+        : 'For any questions, simply reply to this message.',
     ),
   ].join('\n');
 }
