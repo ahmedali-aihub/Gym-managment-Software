@@ -1,7 +1,14 @@
 import { PLAN_TYPE_LABELS, formatINR, type PlanType } from '@azf/shared';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Check, Dumbbell, Plus, Snowflake, Users } from 'lucide-react';
+import {
+  Check,
+  ChevronRight,
+  Dumbbell,
+  Plus,
+  Snowflake,
+  Users,
+} from 'lucide-react';
 import * as React from 'react';
 import { EmptyState, ErrorState } from '@/components/common/states';
 import { Badge } from '@/components/ui/badge';
@@ -37,6 +44,10 @@ interface Distribution {
  * Presented as cards rather than a table: a plan is a product with a price
  * and a feature list, and staff choosing one at the desk read it the way a
  * customer would, not as a spreadsheet row.
+ *
+ * Except on a phone, where one card filled the screen and imported history
+ * brings dozens of plans. There it is a list of name, terms and price, and a
+ * tap opens the same editor, which shows the rest.
  */
 export function PlansPage() {
   const [editorOpen, setEditorOpen] = React.useState(false);
@@ -112,104 +123,158 @@ export function PlansPage() {
           />
         </Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {data.map((plan, index) => {
-            const members = memberCount.get(plan.id) ?? 0;
+        <>
+          <Card className="divide-y divide-border overflow-hidden sm:hidden">
+            {data.map((plan) => {
+              const members = memberCount.get(plan.id) ?? 0;
 
-            return (
-              <motion.div
-                key={plan.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{
-                  duration: 0.3,
-                  delay: Math.min(index * 0.05, 0.3),
-                }}
-              >
-                <Card className="flex h-full flex-col">
-                  <CardContent className="flex flex-1 flex-col pt-6">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <h3 className="font-display text-base font-semibold tracking-tight">
-                          {plan.name}
-                        </h3>
-                        <Badge variant="secondary" size="sm" className="mt-1.5">
-                          {PLAN_TYPE_LABELS[plan.type]}
-                        </Badge>
-                      </div>
+              return (
+                <button
+                  key={plan.id}
+                  type="button"
+                  onClick={() => openEditor(plan)}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors active:bg-accent"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[15px] font-medium">
+                      {plan.name}
+                    </p>
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                      {PLAN_TYPE_LABELS[plan.type]} · {plan.durationDays} days
+                      {members > 0 &&
+                        ` · ${members} member${members === 1 ? '' : 's'}`}
+                    </p>
+                  </div>
 
-                      {members > 0 && (
-                        <div className="flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-[11px] text-muted-foreground">
-                          <Users className="size-3" />
-                          <span className="tabular">{members}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="mt-4">
-                      <span className="tabular font-display text-[28px] font-semibold leading-none tracking-tight">
-                        {formatINR(plan.pricePaise, { showDecimals: false })}
-                      </span>
-                      <span className="ml-1.5 text-sm text-muted-foreground">
-                        / {plan.durationDays} days
-                      </span>
-                    </div>
-
+                  <div className="shrink-0 text-right">
+                    <p className="tabular text-[15px] font-semibold">
+                      {formatINR(plan.pricePaise, { showDecimals: false })}
+                    </p>
                     {plan.joiningFeePaise > 0 && (
-                      <p className="mt-1 text-[12px] text-muted-foreground">
-                        +{' '}
+                      <p className="tabular text-[11px] text-muted-foreground">
+                        +
                         {formatINR(plan.joiningFeePaise, {
                           showDecimals: false,
                         })}{' '}
-                        one-time joining fee
+                        joining
                       </p>
                     )}
+                  </div>
 
-                    {plan.description && (
-                      <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">
-                        {plan.description}
-                      </p>
-                    )}
+                  <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+                </button>
+              );
+            })}
+          </Card>
 
-                    <Separator className="my-4" />
+          <div className="hidden gap-4 sm:grid sm:grid-cols-2 lg:grid-cols-3">
+            {data.map((plan, index) => {
+              const members = memberCount.get(plan.id) ?? 0;
 
-                    <ul className="flex-1 space-y-2">
-                      {plan.features.map((feature) => (
-                        <li
-                          key={feature}
-                          className="flex items-start gap-2 text-[13px]"
-                        >
-                          <Check className="mt-0.5 size-3.5 shrink-0 text-success" />
-                          <span className="text-muted-foreground">
-                            {feature}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
+              return (
+                <motion.div
+                  key={plan.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{
+                    duration: 0.3,
+                    delay: Math.min(index * 0.05, 0.3),
+                  }}
+                >
+                  <Card className="flex h-full flex-col">
+                    <CardContent className="flex flex-1 flex-col pt-6">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <h3 className="font-display text-base font-semibold tracking-tight">
+                            {plan.name}
+                          </h3>
+                          <Badge variant="secondary" size="sm" className="mt-1.5">
+                            {PLAN_TYPE_LABELS[plan.type]}
+                          </Badge>
+                        </div>
 
-                    {plan.maxFreezeDays > 0 && (
-                      <div className="mt-4 flex items-center gap-1.5 rounded-lg bg-info/[0.08] px-2.5 py-1.5 text-[12px] text-info">
-                        <Snowflake className="size-3.5" />
-                        {plan.maxFreezeDays} freeze days included
+                        {members > 0 && (
+                          <div className="flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-[11px] text-muted-foreground">
+                            <Users className="size-3" />
+                            <span className="tabular">{members}</span>
+                          </div>
+                        )}
                       </div>
-                    )}
 
-                    <div className="mt-5 flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1"
-                        onClick={() => openEditor(plan)}
-                      >
-                        Edit
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            );
-          })}
-        </div>
+                      <div className="mt-4">
+                        <span className="tabular font-display text-[28px] font-semibold leading-none tracking-tight">
+                          {formatINR(plan.pricePaise, { showDecimals: false })}
+                        </span>
+                        <span className="ml-1.5 text-sm text-muted-foreground">
+                          / {plan.durationDays} days
+                        </span>
+                      </div>
+
+                      {plan.joiningFeePaise > 0 && (
+                        <p className="mt-1 text-[12px] text-muted-foreground">
+                          +{' '}
+                          {formatINR(plan.joiningFeePaise, {
+                            showDecimals: false,
+                          })}{' '}
+                          one-time joining fee
+                        </p>
+                      )}
+
+                      {plan.description && (
+                        <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">
+                          {plan.description}
+                        </p>
+                      )}
+
+                      {/* A rule and an empty list left a blank band above
+                          Edit on every plan without features. */}
+                      {plan.features.length > 0 && (
+                        <>
+                          <Separator className="my-4" />
+
+                          <ul className="space-y-2">
+                            {plan.features.map((feature) => (
+                              <li
+                                key={feature}
+                                className="flex items-start gap-2 text-[13px]"
+                              >
+                                <Check className="mt-0.5 size-3.5 shrink-0 text-success" />
+                                <span className="text-muted-foreground">
+                                  {feature}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </>
+                      )}
+
+                      {/* Keeps Edit on the bottom edge across a row of cards. */}
+                      <div className="flex-1" />
+
+                      {plan.maxFreezeDays > 0 && (
+                        <div className="mt-4 flex items-center gap-1.5 rounded-lg bg-info/[0.08] px-2.5 py-1.5 text-[12px] text-info">
+                          <Snowflake className="size-3.5" />
+                          {plan.maxFreezeDays} freeze days included
+                        </div>
+                      )}
+
+                      <div className="mt-5 flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => openEditor(plan)}
+                        >
+                          Edit
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              );
+            })}
+          </div>
+        </>
       )}
 
       <PlanEditorDialog
