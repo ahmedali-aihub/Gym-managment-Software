@@ -170,7 +170,7 @@ In Vercel → your project → **Settings → Environment Variables**
 | `WHATSAPP_API_VERSION` | `v25.0`. The old value, `v21.0`, stops working on 21 January 2027. |
 | `WHATSAPP_LANGUAGE` | `en` (English, as chosen for the templates) |
 | `WHATSAPP_ENABLED` | `true` |
-| `GYM_PHONE` | the gym's real phone number. It is printed in every welcome and reminder; it is still `+91 00000 00000`. |
+| `GYM_PHONE` | the gym's phone number, printed on receipts and in every WhatsApp message. Defaults to `+91 93912 10744`; set it only to change that. |
 
 Then go to **Deployments**, open the latest deployment's **⋯** menu and click
 **Redeploy**. Settings only take effect after a redeploy.

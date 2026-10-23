@@ -42,7 +42,7 @@ const envSchema = z
     GYM_NAME: z.string().default('A to Z Fitness'),
     GYM_ADDRESS_LINE1: z.string().default('Mehdipatnam'),
     GYM_ADDRESS_LINE2: z.string().default('Hyderabad, Telangana 500028'),
-    GYM_PHONE: z.string().default('+91 00000 00000'),
+    GYM_PHONE: z.string().default('+91 93912 10744'),
     GYM_EMAIL: z.string().default('info@atozfitness.in'),
     GYM_STATE_CODE: z.coerce.number().int().default(36),
 

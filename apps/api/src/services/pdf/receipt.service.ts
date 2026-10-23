@@ -230,7 +230,8 @@ export async function generateReceiptPdf(invoiceId: string): Promise<{
     .font('Helvetica')
     .text(gymConfig.addressLine1, textX, y + 26)
     .text(gymConfig.addressLine2, textX, y + 38)
-    .text(`${formatPhone(gymConfig.phone)}  ·  ${gymConfig.email}`, textX, y + 50);
+    // Phone only: the email address read as a website plug on a receipt.
+    .text(formatPhone(gymConfig.phone), textX, y + 50);
 
   if (invoice.isGstInvoice && invoice.gstin) {
     doc.text(`GSTIN: ${invoice.gstin}`, textX, y + 62);
