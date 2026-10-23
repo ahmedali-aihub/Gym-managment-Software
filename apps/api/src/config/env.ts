@@ -166,6 +166,13 @@ const envSchema = z
     /// Shared secret for the Vercel Cron endpoints. Absent means cron is
     /// not in use and those routes refuse every request.
     CRON_SECRET: z.string().optional(),
+    /// Signs the receipt links sent to members on WhatsApp (lib/receipt-link).
+    /// Optional: without it a key is derived from JWT_REFRESH_SECRET. Set it
+    /// before ever rotating that secret, or links already sent stop working.
+    RECEIPT_LINK_SECRET: z.preprocess(
+      (v) => (v === '' ? undefined : v),
+      z.string().min(32, 'RECEIPT_LINK_SECRET must be at least 32 characters').optional(),
+    ),
 
     // Rate limiting
     RATE_LIMIT_WINDOW_MS: z.coerce.number().int().default(900_000),

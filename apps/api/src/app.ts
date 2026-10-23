@@ -19,6 +19,7 @@ import { cronRoutes } from './modules/cron/cron.routes.js';
 import { dashboardRoutes } from './modules/dashboard/dashboard.routes.js';
 import { expensesRoutes } from './modules/expenses/expenses.routes.js';
 import { invoicesRoutes } from './modules/invoices/invoices.routes.js';
+import { publicReceiptRoutes } from './modules/invoices/public-receipt.routes.js';
 import { leadsRoutes } from './modules/leads/leads.routes.js';
 import { importRoutes } from './modules/import/import.routes.js';
 import { membersRoutes } from './modules/members/members.routes.js';
@@ -148,6 +149,9 @@ export function createApp(): Application {
   app.use('/api/memberships', membershipsRoutes);
   app.use('/api/payments', paymentsRoutes);
   app.use('/api/invoices', invoicesRoutes);
+  // Members' receipt links from WhatsApp. No session: the signed token is
+  // the authorisation — see public-receipt.routes.ts.
+  app.use('/api/r', publicReceiptRoutes);
   app.use('/api/expenses', expensesRoutes);
   app.use('/api/leads', leadsRoutes);
   app.use('/api/sms', smsRoutes);
