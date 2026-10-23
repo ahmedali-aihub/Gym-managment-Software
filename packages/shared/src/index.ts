@@ -13,6 +13,7 @@ export * from './types/enums.js';
 export * from './constants/money.js';
 export * from './constants/dates.js';
 export * from './constants/identifiers.js';
+export * from './constants/whatsapp-chat.js';
 
 // Schemas
 export * from './schemas/common.schema.js';
