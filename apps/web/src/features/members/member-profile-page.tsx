@@ -38,8 +38,13 @@ import {
   Wallet,
 } from 'lucide-react';
 import * as React from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { EmptyState, ErrorState } from '@/components/common/states';
+import {
+  WhatsAppSendDialog,
+  useWhatsAppSend,
+  type WhatsAppSendState,
+} from '@/components/common/whatsapp-send-dialog';
 import { MemberAvatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -154,6 +159,22 @@ export function MemberProfilePage() {
   const canEdit = hasRole(Role.OWNER, Role.MANAGER, Role.RECEPTIONIST);
 
   const [editOpen, setEditOpen] = React.useState(false);
+
+  const location = useLocation();
+  const whatsapp = useWhatsAppSend();
+
+  // Arriving from registration, which has already opened WhatsApp: show
+  // what was typed there. The navigation state is cleared at once, so a
+  // refresh does not bring the dialog back.
+  React.useEffect(() => {
+    const handed = (location.state as { whatsappSend?: WhatsAppSendState } | null)
+      ?.whatsappSend;
+    if (handed) {
+      whatsapp.setState(handed);
+      navigate(location.pathname, { replace: true, state: null });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [paymentOpen, setPaymentOpen] = React.useState(false);
   const [freezeOpen, setFreezeOpen] = React.useState(false);
@@ -655,6 +676,11 @@ export function MemberProfilePage() {
         open={editOpen}
         onOpenChange={setEditOpen}
         member={data}
+      />
+
+      <WhatsAppSendDialog
+        state={whatsapp.state}
+        onClose={() => whatsapp.setState(null)}
       />
 
       <FreezeDialog

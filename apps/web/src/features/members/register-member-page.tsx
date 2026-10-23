@@ -40,8 +40,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import type { WhatsAppSendState } from '@/components/common/whatsapp-send-dialog';
 import { api, getErrorMessage, getFieldErrors } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
+import { openWhatsApp, type WhatsAppMessage } from '@/lib/whatsapp';
 
 interface Plan {
   id: string;
@@ -187,7 +189,16 @@ export function RegisterMemberPage() {
   const mutation = useMutation({
     mutationFn: async (values: RegisterForm) => {
       const response = await api.post<{
-        data: { member: { id: string; memberId: string; email: string | null } };
+        data: {
+          member: {
+            id: string;
+            memberId: string;
+            fullName: string;
+            email: string | null;
+          };
+          /** The welcome, ready to send from the desk's WhatsApp. */
+          whatsapp: WhatsAppMessage | null;
+        };
       }>('/members', {
         fullName: values.fullName,
         phone: values.phone,
@@ -238,16 +249,36 @@ export function RegisterMemberPage() {
       void queryClient.invalidateQueries({ queryKey: ['analytics'] });
       void queryClient.invalidateQueries({ queryKey: ['today-collection'] });
 
-      // What actually goes out — see the "will automatically receive" list.
-      // SMS is not offered on this form, so it must not be promised here,
-      // and a "pay later" registration has no receipt to attach.
-      const channels = data.member.email ? 'WhatsApp and email' : 'WhatsApp';
+      // WhatsApp opens on the member's chat with the welcome typed. Done
+      // here, not after navigating: the browser only allows a new tab while
+      // this still counts as part of the Register click.
+      const opened = data.whatsapp ? openWhatsApp(data.whatsapp) : false;
+
+      // What actually goes out. SMS is not offered on this form, so it must
+      // not be promised, and a "pay later" registration has no receipt.
       const withReceipt = Number(values.amountPaidRupees) > 0;
+      const notes = [
+        data.member.email &&
+          `Welcome email${withReceipt ? ' with the receipt' : ''} sent.`,
+        data.whatsapp &&
+          (opened
+            ? 'WhatsApp is open — press Send.'
+            : 'Open WhatsApp from the profile to send the welcome.'),
+      ].filter(Boolean);
       toast.success(`${data.member.memberId} registered`, {
-        description: `Welcome ${channels}${withReceipt ? ' with the receipt' : ''} sent to the member.`,
+        description: notes.join(' '),
       });
 
-      navigate(`/members/${data.member.id}`);
+      const whatsappSend: WhatsAppSendState | undefined = data.whatsapp
+        ? {
+            title: 'Welcome message',
+            recipient: data.member.fullName,
+            message: data.whatsapp,
+            opened,
+          }
+        : undefined;
+
+      navigate(`/members/${data.member.id}`, { state: { whatsappSend } });
     },
 
     onError: (error) => {
@@ -475,20 +506,20 @@ export function RegisterMemberPage() {
                 The API still accepts sendWelcomeSms if that ever changes. */}
             <div className="rounded-xl bg-muted/40 px-3.5 py-3">
               <p className="text-[13px] font-medium">
-                This member will automatically receive
+                After you register this member
               </p>
               <ul className="mt-1.5 space-y-1 text-[12px] text-muted-foreground">
                 <li className="flex items-center gap-2">
-                  <MessageCircle className="size-3.5 shrink-0" />
-                  WhatsApp with their member ID, plan, expiry date and the
-                  receipt PDF
-                </li>
-                <li className="flex items-center gap-2">
                   <Mail className="size-3.5 shrink-0" />
-                  Email with the receipt PDF attached
+                  The welcome email with the receipt PDF goes automatically
                   <span className="text-muted-foreground/70">
                     (if an email address is given)
                   </span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <MessageCircle className="size-3.5 shrink-0" />
+                  WhatsApp opens on their chat with the welcome and receipt
+                  link typed — you just press Send
                 </li>
               </ul>
 
