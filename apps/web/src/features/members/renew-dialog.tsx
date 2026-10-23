@@ -1,12 +1,15 @@
 import {
+  PAYMENT_MODE_LABELS,
   calculateExpiryDate,
   formatDate,
+  formatDateLong,
   formatINR,
   rupeesToPaise,
   toDateInputValue,
+  type PaymentMode,
 } from '@azf/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, IndianRupee, RefreshCw, Sun } from 'lucide-react';
+import { Check, IndianRupee, RefreshCw, Sun, Undo2 } from 'lucide-react';
 import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -462,6 +465,140 @@ export function UnfreezeDialog({
           >
             <Sun />
             Resume
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * Undo a renewal entered by mistake.
+ *
+ * Says exactly what will disappear — the plan, each payment, each receipt
+ * number — because the server deletes them, and an owner confirming a vague
+ * "undo?" cannot know they are about to remove ₹12,000 from the books.
+ */
+export function UndoRenewalDialog({
+  open,
+  onOpenChange,
+  member,
+  membership,
+  payments,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  member: { id: string; memberId: string; fullName: string };
+  membership: {
+    id: string;
+    startDate: string;
+    endDate: string;
+    plan: { name: string };
+  } | null;
+  payments: Array<{
+    id: string;
+    amountPaise: number;
+    mode: PaymentMode;
+    invoice: { invoiceNumber: string } | null;
+  }>;
+}) {
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const response = await api.post<{
+        data: { memberStatus: string; releasedReceipts: string[] };
+      }>(`/memberships/${membership?.id}/undo-renewal`);
+      return response.data.data;
+    },
+    onSuccess: (result) => {
+      // Money, counts and the member's status all moved.
+      for (const key of [
+        ['member', member.id],
+        ['member-history', member.id],
+        ['members'],
+        ['payments'],
+        ['payment-stats'],
+        ['dashboard'],
+        ['analytics'],
+        ['today-collection'],
+      ]) {
+        void queryClient.invalidateQueries({ queryKey: key });
+      }
+
+      toast.success('Renewal undone', {
+        description:
+          result.releasedReceipts.length > 0
+            ? `The next receipt will reuse ${result.releasedReceipts.join(', ')}.`
+            : `${member.fullName} is ${result.memberStatus.toLowerCase()} again.`,
+      });
+      onOpenChange(false);
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
+  if (!membership) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Undo this renewal?</DialogTitle>
+          <DialogDescription>
+            {member.fullName} · {member.memberId}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="mt-4 space-y-3 text-sm">
+          <p className="text-muted-foreground">
+            For a renewal entered by mistake. This removes, as if it never
+            happened:
+          </p>
+
+          <ul className="space-y-1.5 rounded-xl bg-muted/50 px-4 py-3">
+            <li>
+              <span className="font-medium">{membership.plan.name}</span>{' '}
+              <span className="text-muted-foreground">
+                · {formatDateLong(membership.startDate)} –{' '}
+                {formatDateLong(membership.endDate)}
+              </span>
+            </li>
+            {payments.map((payment) => (
+              <li key={payment.id} className="tabular">
+                <span className="font-medium">
+                  {formatINR(payment.amountPaise, { showDecimals: false })}
+                </span>{' '}
+                <span className="text-muted-foreground">
+                  {PAYMENT_MODE_LABELS[payment.mode]} payment
+                  {payment.invoice && ` · receipt ${payment.invoice.invoiceNumber}`}
+                </span>
+              </li>
+            ))}
+          </ul>
+
+          <p className="text-muted-foreground">
+            The previous plan comes back if it was still running, and the
+            undo is recorded in the member&apos;s history. It can&apos;t be
+            reversed.
+          </p>
+        </div>
+
+        <DialogFooter className="mt-5">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => onOpenChange(false)}
+          >
+            Keep it
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={() => mutation.mutate()}
+            loading={mutation.isPending}
+            loadingText="Undoing…"
+          >
+            <Undo2 />
+            Undo renewal
           </Button>
         </DialogFooter>
       </DialogContent>

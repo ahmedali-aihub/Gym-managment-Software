@@ -102,4 +102,11 @@ membershipRouter.post(
   asyncHandler(membershipsController.renew),
 );
 
+// Deletes a payment and its receipt — the owner's call alone, and logged.
+membershipRouter.post(
+  '/:id/undo-renewal',
+  requireRole(Role.OWNER),
+  asyncHandler(membershipsController.undoRenewal),
+);
+
 export { membershipRouter as membershipsRoutes };
