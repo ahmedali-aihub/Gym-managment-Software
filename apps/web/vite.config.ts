@@ -5,6 +5,11 @@ import { defineConfig } from 'vite';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// Where /api goes in development. Overridable so a second API — one on a
+// throwaway test database, say — can be used without touching the one on
+// :4000, which reads the real .env and therefore the real database.
+const apiTarget = process.env.API_PROXY_TARGET ?? 'http://localhost:4000';
+
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -17,8 +22,8 @@ export default defineConfig({
     // Proxying in dev keeps the frontend same-origin with the API, so the
     // httpOnly refresh cookie behaves exactly as it will in production.
     proxy: {
-      '/api': { target: 'http://localhost:4000', changeOrigin: true },
-      '/uploads': { target: 'http://localhost:4000', changeOrigin: true },
+      '/api': { target: apiTarget, changeOrigin: true },
+      '/uploads': { target: apiTarget, changeOrigin: true },
     },
   },
   build: {
