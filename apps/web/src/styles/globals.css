@@ -405,6 +405,19 @@
       0 2px 4px -1px hsl(0 0% 0% / 0.35),
       0 8px 20px -4px hsl(0 0% 0% / 0.3);
   }
+
+  /**
+   * A row of chips that scrolls sideways on a phone.
+   *
+   * No scrollbar: it would sit between the chips and whatever is below, and
+   * the chip cut off at the edge already says there is more.
+   */
+  .scroll-row {
+    scrollbar-width: none;
+  }
+  .scroll-row::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 @keyframes shimmer {

@@ -307,7 +307,9 @@ export function MembersPage() {
       </div>
 
       {/* ── Stat strip ──────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      {/* Five across even on a phone, as compact counters: stacked two to a
+          row they took three rows before the search box. */}
+      <div className="grid grid-cols-5 gap-1.5 sm:gap-3">
         <StatChip
           label="Total"
           value={stats?.total}
@@ -326,6 +328,7 @@ export function MembersPage() {
         />
         <StatChip
           label="Expiring (7d)"
+          shortLabel="Expiring"
           value={stats?.expiringSoon}
           tone="warning"
           active={expiringInDays === '7'}
@@ -611,19 +614,23 @@ export function MembersPage() {
             {/* Mobile cards — a 5-column table is unusable on a phone. */}
             <div className="divide-y divide-border md:hidden">
               {data.data.map((member) => (
+                // Three single lines: who, how to reach them, where their
+                // plan stands. The start date, the paid total and the
+                // chevron made five lines a row; they are a tap away on the
+                // profile, and the whole row is the link.
                 <Link
                   key={member.id}
                   to={`/members/${member.id}`}
-                  className="flex items-center gap-3 p-4 transition-colors active:bg-accent"
+                  className="flex items-center gap-3 px-4 py-3 transition-colors active:bg-accent"
                 >
                   <MemberAvatar
                     name={member.fullName}
                     photoUrl={member.photoUrl}
-                    className="size-11"
+                    className="size-10"
                   />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="truncate font-medium">
+                      <span className="truncate text-[15px] font-medium">
                         {member.fullName}
                       </span>
                       <Badge
@@ -635,40 +642,38 @@ export function MembersPage() {
                       </Badge>
                     </div>
 
-                    <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-                      <Phone className="size-3" />
-                      {formatPhone(member.phone)}
+                    <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Phone className="size-3 shrink-0" />
+                      <span className="tabular">{formatPhone(member.phone)}</span>
                     </div>
 
                     {member.memberships[0] && (
-                      <div className="tabular mt-1 text-xs text-muted-foreground">
+                      <div className="mt-0.5 truncate text-xs text-muted-foreground">
                         {member.memberships[0].plan.name} ·{' '}
-                        {formatDate(member.memberships[0].startDate)} –{' '}
-                        {formatDate(member.memberships[0].endDate)}
+                        {relativeExpiry(member.memberships[0].endDate)}
                       </div>
                     )}
+                  </div>
 
-                    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-                      <span className="tabular text-xs">
-                        <span className="text-muted-foreground">Paid </span>
-                        <span className="font-medium">
-                          {formatINR(member.totalPaidPaise, {
-                            showDecimals: false,
-                          })}
-                        </span>
-                      </span>
-
-                      {member.balanceDuePaise > 0 && (
-                        <span className="tabular text-xs font-semibold text-destructive">
+                  {/* What the desk acts on: money owed, or that none is. */}
+                  <div className="shrink-0 text-right">
+                    {member.balanceDuePaise > 0 ? (
+                      <>
+                        <div className="tabular text-[13px] font-semibold text-destructive">
                           {formatINR(member.balanceDuePaise, {
                             showDecimals: false,
-                          })}{' '}
+                          })}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground">
                           due
-                        </span>
-                      )}
-                    </div>
+                        </div>
+                      </>
+                    ) : (
+                      <Badge variant="success" size="sm">
+                        Paid
+                      </Badge>
+                    )}
                   </div>
-                  <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
                 </Link>
               ))}
             </div>
@@ -734,12 +739,15 @@ function Th({
 
 function StatChip({
   label,
+  shortLabel,
   value,
   tone = 'default',
   active,
   onClick,
 }: {
   label: string;
+  /** Used on phones, where five chips share one row. */
+  shortLabel?: string;
   value?: number;
   tone?: 'default' | 'success' | 'warning' | 'destructive' | 'info';
   active?: boolean;
@@ -757,21 +765,24 @@ function StatChip({
     <button
       onClick={onClick}
       className={cn(
-        'rounded-xl border bg-card px-4 py-3 text-left transition-all',
+        'min-w-0 rounded-xl border bg-card px-2 py-2 text-left transition-all sm:px-4 sm:py-3',
         'hover:border-ring/40 hover:shadow-soft',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         active ? 'border-primary ring-1 ring-primary' : 'border-border',
       )}
       aria-pressed={active}
     >
-      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="truncate text-[11px] text-muted-foreground sm:text-xs">
+        <span className="sm:hidden">{shortLabel ?? label}</span>
+        <span className="hidden sm:inline">{label}</span>
+      </div>
       <div
         className={cn(
-          'tabular mt-1 font-display text-xl font-bold',
+          'tabular mt-0.5 font-display text-base font-bold sm:mt-1 sm:text-xl',
           toneStyles[tone],
         )}
       >
-        {value ?? <Skeleton className="inline-block h-6 w-10" />}
+        {value ?? <Skeleton className="inline-block h-5 w-8 sm:h-6 sm:w-10" />}
       </div>
     </button>
   );

@@ -54,8 +54,16 @@ export function GoalFilter({
   }
 
   return (
-    <div className={cn('flex flex-wrap items-center gap-1.5', className)}>
-      <span className="mr-0.5 text-[12px] font-medium text-muted-foreground">
+    // One swipeable line on a phone; wrapped, the eight chips took four
+    // lines and pushed the member list a screen down.
+    <div
+      className={cn(
+        'scroll-row -mx-3 flex items-center gap-1.5 overflow-x-auto px-3',
+        'sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0',
+        className,
+      )}
+    >
+      <span className="mr-0.5 shrink-0 text-[12px] font-medium text-muted-foreground">
         Focus
       </span>
 
@@ -70,7 +78,7 @@ export function GoalFilter({
             onClick={() => toggle(goal)}
             aria-pressed={active}
             className={cn(
-              'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-medium transition-all',
+              'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-[12px] font-medium transition-all',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
               active
                 ? 'border-primary bg-primary text-primary-foreground'
@@ -88,7 +96,7 @@ export function GoalFilter({
           variant="ghost"
           size="sm"
           onClick={() => onChange([])}
-          className="h-7 px-2 text-[12px]"
+          className="h-7 shrink-0 px-2 text-[12px]"
         >
           <X className="size-3" />
           Clear
