@@ -10,6 +10,10 @@ import {
   actorFromRequest,
   auditService,
 } from '../../services/audit/audit.service.js';
+import {
+  chatMessageOrNull,
+  chatMessageService,
+} from '../../services/whatsapp/chat-message.service.js';
 import { membersService } from './members.service.js';
 
 export const membersController = {
@@ -36,9 +40,16 @@ export const membersController = {
       actorFromRequest(req),
     );
 
+    // The welcome, ready for the desk to send from its own WhatsApp — handed
+    // back here so the browser can open the chat straight away.
+    const whatsapp = await chatMessageOrNull(
+      chatMessageService.welcome(result.member.id),
+      { memberId: result.member.memberId },
+    );
+
     res.status(201).json({
       success: true,
-      data: { member: result.member, qrDataUrl: result.qrDataUrl },
+      data: { member: result.member, qrDataUrl: result.qrDataUrl, whatsapp },
     });
   },
 

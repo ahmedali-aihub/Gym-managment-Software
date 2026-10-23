@@ -1,9 +1,11 @@
+import { Role } from '@azf/shared';
 import { Router } from 'express';
 import { NotFoundError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
-import { authenticate } from '../../middleware/auth.middleware.js';
+import { authenticate, requireRole } from '../../middleware/auth.middleware.js';
 import { asyncHandler } from '../../middleware/error.middleware.js';
 import { generateReceiptPdf } from '../../services/pdf/receipt.service.js';
+import { chatMessageService } from '../../services/whatsapp/chat-message.service.js';
 
 const router = Router();
 
@@ -37,6 +39,19 @@ router.get(
     res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
     res.setHeader('Content-Length', buffer.byteLength);
     res.send(buffer);
+  }),
+);
+
+/**
+ * The receipt as a message for the desk to send from its own WhatsApp.
+ * Front desk only: the text carries the member's receipt link.
+ */
+router.get(
+  '/:id/whatsapp',
+  requireRole(Role.OWNER, Role.MANAGER, Role.RECEPTIONIST),
+  asyncHandler(async (req, res) => {
+    const message = await chatMessageService.receipt(req.params.id as string);
+    res.json({ success: true, data: message });
   }),
 );
 

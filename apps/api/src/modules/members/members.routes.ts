@@ -11,6 +11,7 @@ import {
   validateBody,
   validateQuery,
 } from '../../middleware/validate.middleware.js';
+import { chatMessageService } from '../../services/whatsapp/chat-message.service.js';
 import { membersController } from './members.controller.js';
 
 const router = Router();
@@ -30,6 +31,20 @@ router.get('/stats', asyncHandler(membersController.stats));
 router.get('/code/:memberId', asyncHandler(membersController.getByMemberId));
 
 router.get('/:id', asyncHandler(membersController.getProfile));
+
+/**
+ * The welcome message for the desk to send from its own WhatsApp — again,
+ * after registration has already offered it once. Front desk only: the
+ * text carries a link to the member's receipt.
+ */
+router.get(
+  '/:id/whatsapp/welcome',
+  requireRole(Role.OWNER, Role.MANAGER, Role.RECEPTIONIST),
+  asyncHandler(async (req, res) => {
+    const message = await chatMessageService.welcome(req.params.id as string);
+    res.json({ success: true, data: message });
+  }),
+);
 
 /**
  * Change history for one member.

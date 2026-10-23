@@ -5,6 +5,10 @@ import type {
 } from '@azf/shared';
 import type { Request, Response } from 'express';
 import { requireUser } from '../../middleware/auth.middleware.js';
+import {
+  chatMessageOrNull,
+  chatMessageService,
+} from '../../services/whatsapp/chat-message.service.js';
 import { paymentsService } from './payments.service.js';
 
 export const paymentsController = {
@@ -15,9 +19,15 @@ export const paymentsController = {
       actor.sub,
     );
 
+    // The receipt message, ready for the desk to send from its WhatsApp.
+    const whatsapp = await chatMessageOrNull(
+      chatMessageService.receiptForPayment(result.payment.id),
+      { paymentId: result.payment.id },
+    );
+
     res.status(201).json({
       success: true,
-      data: { payment: result.payment, balance: result.balance },
+      data: { payment: result.payment, balance: result.balance, whatsapp },
     });
   },
 
