@@ -32,6 +32,8 @@ export interface SegmentedOption<T extends string> {
   /** Shorter label for narrow screens; falls back to `label`. */
   shortLabel?: string;
   icon?: React.ComponentType<{ className?: string }>;
+  /** Shown instead of `icon` while this option is selected (a filled glyph). */
+  activeIcon?: React.ComponentType<{ className?: string }>;
 }
 
 /** The spring every segmented movement uses, matching the nav bar. */
@@ -51,11 +53,13 @@ export function SegmentedControl<T extends string>({
   size = 'default',
 }: {
   options: Array<SegmentedOption<T>>;
-  value: T;
+  /** null, or a value no option has, shows no marker: nothing is selected. */
+  value: T | null;
   onChange: (value: T) => void;
   className?: string;
   ariaLabel: string;
-  size?: 'default' | 'sm';
+  /** 'tab': icon above a short label, sized for a thumb — the phone tab bar. */
+  size?: 'default' | 'sm' | 'tab';
 }) {
   const railRef = React.useRef<HTMLDivElement>(null);
   const itemRefs = React.useRef<Array<HTMLButtonElement | null>>([]);
@@ -70,10 +74,8 @@ export function SegmentedControl<T extends string>({
   // False until positioned once, so the marker does not fly in from x=0.
   const settledRef = React.useRef(false);
 
-  const activeIndex = Math.max(
-    0,
-    options.findIndex((option) => option.value === value),
-  );
+  // -1 when nothing is selected — the tab bar on a page it has no tab for.
+  const activeIndex = options.findIndex((option) => option.value === value);
 
   /**
    * Measure every option relative to the rail.
@@ -164,14 +166,21 @@ export function SegmentedControl<T extends string>({
     ? (dragWidthRef.current ?? activeBound?.width ?? 0)
     : (activeBound?.width ?? 0);
 
-  const height = size === 'sm' ? 'h-7' : 'h-9';
-  const textSize = size === 'sm' ? 'text-[12px]' : 'text-[13px]';
-  const padding = size === 'sm' ? 'px-2.5' : 'px-3';
+  const tab = size === 'tab';
+  const height = tab ? 'h-[52px]' : size === 'sm' ? 'h-7' : 'h-9';
+  const textSize = tab
+    ? 'text-[10.5px]'
+    : size === 'sm'
+      ? 'text-[12px]'
+      : 'text-[13px]';
+  const padding = tab ? 'min-w-[62px] px-2' : size === 'sm' ? 'px-2.5' : 'px-3';
 
   return (
     <div
       className={cn(
-        'inline-flex items-center rounded-full border border-border bg-muted/40 p-1',
+        'inline-flex items-center rounded-full p-1',
+        // The tab bar brings its own surface (frosted glass) via className.
+        !tab && 'border border-border bg-muted/40',
         className,
       )}
       role="radiogroup"
@@ -233,7 +242,9 @@ export function SegmentedControl<T extends string>({
         {options.map((option, index) => {
           const active = index === activeIndex;
           const targeted = dragging && hoverIndex === index;
-          const Icon = option.icon;
+          const highlighted = (active && !dragging) || targeted;
+          const Icon =
+            highlighted && option.activeIcon ? option.activeIcon : option.icon;
 
           return (
             <button
@@ -248,8 +259,12 @@ export function SegmentedControl<T extends string>({
               // Transparent to the pointer mid-drag, or crossing one steals
               // the capture and the gesture dies partway along the rail.
               style={dragging ? { pointerEvents: 'none' } : undefined}
+              aria-label={tab ? option.label : undefined}
               className={cn(
-                'relative z-10 flex items-center gap-1.5 rounded-full font-medium',
+                'relative z-10 flex items-center rounded-full font-medium',
+                tab
+                  ? 'flex-col justify-center gap-0.5 leading-none'
+                  : 'gap-1.5',
                 'transition-colors duration-200',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                 height,
@@ -259,12 +274,14 @@ export function SegmentedControl<T extends string>({
                 // reading dark-on-cream. During a drag it has moved away and
                 // dark text on the bar is invisible — so the colour reverts
                 // for the duration of the gesture.
-                (active && !dragging) || targeted
+                highlighted
                   ? 'text-primary-foreground'
                   : 'text-muted-foreground hover:text-foreground',
               )}
             >
-              {Icon && <Icon className="size-3.5 shrink-0" />}
+              {Icon && (
+                <Icon className={cn('shrink-0', tab ? 'size-5' : 'size-3.5')} />
+              )}
               {option.shortLabel ? (
                 <>
                   <span className="hidden sm:inline">{option.label}</span>
