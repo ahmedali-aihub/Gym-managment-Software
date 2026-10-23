@@ -370,12 +370,14 @@ function MessageList({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: Math.min(index * 0.03, 0.25) }}
-              className="px-4 py-4 sm:px-5"
+              className="px-4 py-3 sm:px-5 sm:py-4"
             >
               <div className="flex items-start gap-3">
+                {/* The status badge says the same thing; on a phone this
+                    circle only cost the row its width. */}
                 <div
                   className={cn(
-                    'flex size-8 shrink-0 items-center justify-center rounded-full',
+                    'hidden size-8 shrink-0 items-center justify-center rounded-full sm:flex',
                     message.status === 'DELIVERED' && 'bg-success/10 text-success',
                     (message.status === 'SENT' || message.status === 'SENDING') &&
                       'bg-info/10 text-info',
@@ -395,12 +397,20 @@ function MessageList({
                     </span>
                     <Badge variant="outline" size="sm" className="gap-1">
                       <ChannelIcon className="size-3" />
-                      {message.channel === 'EMAIL' ? 'Email' : 'WhatsApp'}
+                      {/* Icon only on a phone, so name, type and status
+                          share one line; still read out in full. */}
+                      <span className="sr-only sm:not-sr-only">
+                        {message.channel === 'EMAIL' ? 'Email' : 'WhatsApp'}
+                      </span>
                     </Badge>
                     <Badge variant="secondary" size="sm">
                       {message.templateLabel}
                     </Badge>
-                    <Badge variant={STATUS_VARIANTS[message.status]} size="sm">
+                    <Badge
+                      variant={STATUS_VARIANTS[message.status]}
+                      size="sm"
+                      className="hidden sm:inline-flex"
+                    >
                       {MESSAGE_STATUS_LABELS[message.status]}
                     </Badge>
                   </div>
@@ -417,6 +427,15 @@ function MessageList({
                         {message.attempts} of {message.maxAttempts} attempts
                       </span>
                     )}
+                    {/* On a phone the status rides here: after a long name
+                        and the message type it wrapped onto a line alone. */}
+                    <Badge
+                      variant={STATUS_VARIANTS[message.status]}
+                      size="sm"
+                      className="sm:hidden"
+                    >
+                      {MESSAGE_STATUS_LABELS[message.status]}
+                    </Badge>
                   </div>
 
                   {message.errorMessage && (
