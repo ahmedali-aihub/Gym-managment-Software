@@ -3,6 +3,7 @@ import * as React from 'react';
 import ReactDOM from 'react-dom/client';
 import { RouterProvider } from 'react-router-dom';
 import { Toaster } from 'sonner';
+import { SuccessNoticeHost } from '@/components/common/success-notice';
 import { TooltipProvider } from '@/components/ui/misc';
 import { ChartAccentProvider } from '@/hooks/use-chart-accent';
 import { ThemeProvider } from '@/hooks/use-theme';
@@ -47,6 +48,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
               richColors
               closeButton
             />
+            <SuccessNoticeHost />
           </TooltipProvider>
         </ChartAccentProvider>
       </ThemeProvider>
