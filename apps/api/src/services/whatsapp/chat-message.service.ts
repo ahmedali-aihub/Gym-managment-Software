@@ -6,6 +6,7 @@ import {
   paiseToRupees,
   receiptChatMessage,
   reminderChatMessage,
+  renewalChatMessage,
   welcomeChatMessage,
   whatsAppPhone,
 } from '@azf/shared';
@@ -114,6 +115,51 @@ class ChatMessageService {
           balance.balanceDuePaise > 0 ? rupees(balance.balanceDuePaise) : undefined,
         receiptNumber: opening?.invoice?.invoiceNumber,
         receiptUrl: opening?.invoice ? receiptUrl(opening.invoice.id) : undefined,
+      }),
+    };
+  }
+
+  /**
+   * Confirmation of a renewal: the new period, and the receipt of the
+   * payment taken with it, if any.
+   */
+  async renewal(membershipId: string): Promise<ChatMessage> {
+    const membership = await prisma.membership.findUnique({
+      where: { id: membershipId },
+      select: {
+        startDate: true,
+        endDate: true,
+        plan: { select: { name: true } },
+        member: { select: { memberId: true, fullName: true, phone: true } },
+        payments: {
+          where: { deletedAt: null },
+          orderBy: { paidAt: 'asc' },
+          take: 1,
+          select: {
+            amountPaise: true,
+            mode: true,
+            invoice: { select: { id: true, invoiceNumber: true } },
+          },
+        },
+      },
+    });
+    if (!membership) throw new NotFoundError('Membership');
+
+    const payment = membership.payments[0];
+
+    return {
+      phone: whatsAppPhone(membership.member.phone),
+      text: renewalChatMessage({
+        ...signature(),
+        name: greetingName(membership.member.fullName),
+        memberId: membership.member.memberId,
+        plan: membership.plan.name,
+        validFrom: formatDateLong(membership.startDate),
+        validUntil: formatDateLong(membership.endDate),
+        amountPaid: payment ? rupees(payment.amountPaise) : undefined,
+        paymentMode: payment ? PAYMENT_MODE_LABELS[payment.mode] : undefined,
+        receiptNumber: payment?.invoice?.invoiceNumber,
+        receiptUrl: payment?.invoice ? receiptUrl(payment.invoice.id) : undefined,
       }),
     };
   }

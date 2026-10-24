@@ -7,7 +7,12 @@ import type {
   UpgradeMembershipInput,
 } from '@azf/shared';
 import type { Request, Response } from 'express';
+import { whatsappConfig } from '../../config/env.js';
 import { requireUser } from '../../middleware/auth.middleware.js';
+import {
+  chatMessageOrNull,
+  chatMessageService,
+} from '../../services/whatsapp/chat-message.service.js';
 import { membershipsService } from './memberships.service.js';
 import { plansService, type PlanQueryParams } from './plans.service.js';
 
@@ -114,7 +119,17 @@ export const membershipsController = {
       req.body as RenewMembershipInput,
       actor.sub,
     );
-    res.status(201).json({ success: true, data: membership });
+
+    // The renewal confirmation, ready for the desk to send from its own
+    // WhatsApp. Spread into the membership rather than wrapping it, so
+    // callers reading data.id keep working.
+    const whatsapp = whatsappConfig.live
+      ? null
+      : await chatMessageOrNull(chatMessageService.renewal(membership.id), {
+          membershipId: membership.id,
+        });
+
+    res.status(201).json({ success: true, data: { ...membership, whatsapp } });
   },
 
   async expiring(req: Request, res: Response): Promise<void> {
