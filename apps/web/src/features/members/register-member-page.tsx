@@ -73,8 +73,6 @@ interface RegisterForm {
   emergencyRelation: string;
   medicalNotes: string;
   startDate: string;
-  discountRupees: string;
-  discountReason: string;
 }
 
 /**
@@ -126,8 +124,6 @@ export function RegisterMemberPage() {
       emergencyRelation: '',
       medicalNotes: '',
       startDate: toDateInputValue(new Date()),
-      discountRupees: '',
-      discountReason: '',
     },
   });
 
@@ -141,7 +137,6 @@ export function RegisterMemberPage() {
 
   const selectedPlanId = watch('planId');
   const startDate = watch('startDate');
-  const discountRupees = watch('discountRupees');
   const amountPaidRupees = watch('amountPaidRupees');
   const paymentMode = watch('paymentMode');
 
@@ -150,30 +145,30 @@ export function RegisterMemberPage() {
   /**
    * Live bill, mirroring the server's calculateBill(). The server stays the
    * authority — this is a preview so the desk can quote a figure aloud.
+   *
+   * The amount typed IS the deal: whatever is agreed below the plan price is
+   * a discount, not a due, so a member who settles at ₹1,800 for a ₹2,000
+   * plan owes nothing afterwards. (The owner's rule; there is no separate
+   * discount field to keep in step.)
    */
   const bill = React.useMemo(() => {
     if (!selectedPlan) return null;
 
     const subtotal = selectedPlan.pricePaise + selectedPlan.joiningFeePaise;
-    const discount = Math.min(
-      rupeesToPaise(Number(discountRupees) || 0),
-      subtotal,
-    );
-    const total = subtotal - discount;
     const paid = rupeesToPaise(Number(amountPaidRupees) || 0);
+    const discount = Math.max(0, subtotal - paid);
 
     return {
       subtotal,
       discount,
-      total,
       paid,
-      balance: Math.max(0, total - paid),
+      overpaid: paid > subtotal,
       expiryDate: calculateExpiryDate(
         new Date(startDate || Date.now()),
         selectedPlan.durationDays,
       ),
     };
-  }, [selectedPlan, discountRupees, amountPaidRupees, startDate]);
+  }, [selectedPlan, amountPaidRupees, startDate]);
 
   // Selecting a plan prefills the full amount — the common case is paying in
   // full, and a prefilled figure is faster to clear than to type.
@@ -231,8 +226,10 @@ export function RegisterMemberPage() {
         payment: {
           amountPaid: rupeesToPaise(Number(values.amountPaidRupees) || 0),
           mode: values.paymentMode,
-          discountAmount: rupeesToPaise(Number(values.discountRupees) || 0),
-          discountReason: values.discountReason || undefined,
+          discountAmount: bill?.discount ?? 0,
+          // The API wants a reason for any discount; here the reason is
+          // always the same — the amount was agreed at the desk.
+          discountReason: bill?.discount ? 'Amount agreed at the desk' : undefined,
           joiningFee: selectedPlan?.joiningFeePaise ?? 0,
           reference: values.reference || undefined,
         },
@@ -428,12 +425,23 @@ export function RegisterMemberPage() {
 
             {/* Money */}
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Amount collected" required>
+              <Field
+                label="Amount paying"
+                required
+                error={errors.amountPaidRupees?.message}
+              >
                 <Input
                   inputMode="decimal"
                   icon={<IndianRupee />}
                   placeholder="0"
-                  {...register('amountPaidRupees')}
+                  error={Boolean(errors.amountPaidRupees)}
+                  {...register('amountPaidRupees', {
+                    validate: (value) =>
+                      !selectedPlan ||
+                      rupeesToPaise(Number(value) || 0) <=
+                        selectedPlan.pricePaise + selectedPlan.joiningFeePaise ||
+                      'Cannot be more than the plan price',
+                  })}
                 />
               </Field>
 
@@ -489,12 +497,14 @@ export function RegisterMemberPage() {
                   <span
                     className={cn(
                       'tabular font-semibold',
-                      bill.balance > 0 ? 'text-destructive' : 'text-success',
+                      bill.overpaid ? 'text-destructive' : 'text-success',
                     )}
                   >
-                    {bill.balance > 0
-                      ? `${formatINR(bill.balance, { showDecimals: false })} due`
-                      : 'Fully paid'}
+                    {bill.overpaid
+                      ? 'More than the plan price'
+                      : bill.discount > 0
+                        ? `${formatINR(bill.discount, { showDecimals: false })} discount · nothing due`
+                        : 'Fully paid'}
                   </span>
                 </div>
               </div>
@@ -650,34 +660,6 @@ export function RegisterMemberPage() {
                       <Input placeholder="500028" {...register('pincode')} />
                     </Field>
 
-                    <Field label="Discount">
-                      <Input
-                        inputMode="decimal"
-                        icon={<IndianRupee />}
-                        placeholder="0"
-                        {...register('discountRupees')}
-                      />
-                    </Field>
-
-                    {Number(discountRupees) > 0 && (
-                      <Field
-                        label="Discount reason"
-                        required
-                        error={errors.discountReason?.message}
-                        className="sm:col-span-2"
-                      >
-                        <Input
-                          placeholder="Festive offer, referral…"
-                          error={Boolean(errors.discountReason)}
-                          {...register('discountReason', {
-                            required:
-                              Number(discountRupees) > 0
-                                ? 'A reason is required when a discount is applied'
-                                : false,
-                          })}
-                        />
-                      </Field>
-                    )}
                   </div>
 
                   <Separator />
