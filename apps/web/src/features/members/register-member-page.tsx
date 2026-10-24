@@ -170,13 +170,15 @@ export function RegisterMemberPage() {
     };
   }, [selectedPlan, amountPaidRupees, startDate]);
 
-  // Selecting a plan prefills the full amount — the common case is paying in
-  // full, and a prefilled figure is faster to clear than to type.
+  // Selecting a plan prefills its full amount — the common case is paying in
+  // full, and a prefilled figure is faster to adjust than to type. Every
+  // pick refills it: filling only an empty box kept the first plan's price
+  // after switching to another.
   React.useEffect(() => {
-    if (selectedPlan && !amountPaidRupees) {
+    if (selectedPlan) {
       const total =
         (selectedPlan.pricePaise + selectedPlan.joiningFeePaise) / 100;
-      setValue('amountPaidRupees', String(total));
+      setValue('amountPaidRupees', String(total), { shouldValidate: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPlanId]);
