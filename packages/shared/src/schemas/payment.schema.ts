@@ -33,7 +33,9 @@ export const recordPaymentSchema = z
 
     /** Generate and store a PDF receipt for this payment. */
     generateInvoice: z.boolean().default(true),
-    sendSms: z.boolean().default(true),
+    // Opt-in: SMS needs DLT registration in India and is not set up. The
+    // receipt goes by email (when there is an address) and WhatsApp.
+    sendSms: z.boolean().default(false),
 
     idempotencyKey: z.string().uuid().optional(),
   })

@@ -1,9 +1,10 @@
 import { formatINR, paiseToRupees, rupeesToPaise } from '@azf/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { IndianRupee, Receipt } from 'lucide-react';
+import { IndianRupee, Mail, MessageCircle, Receipt } from 'lucide-react';
 import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
+import { showSuccessNotice } from '@/components/common/success-notice';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -15,7 +16,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Checkbox, Separator } from '@/components/ui/misc';
+import { Separator } from '@/components/ui/misc';
 import {
   Select,
   SelectContent,
@@ -35,6 +36,7 @@ interface RecordPaymentDialogProps {
     id: string;
     memberId: string;
     fullName: string;
+    email?: string | null;
   };
   balanceDuePaise: number;
   /** Told what WhatsApp was opened with, so the page can show the send dialog. */
@@ -46,7 +48,6 @@ interface PaymentForm {
   mode: 'CASH' | 'UPI' | 'CARD' | 'NET_BANKING';
   reference: string;
   notes: string;
-  sendSms: boolean;
 }
 
 /**
@@ -87,7 +88,6 @@ export function RecordPaymentDialog({
       mode: 'CASH',
       reference: '',
       notes: '',
-      sendSms: true,
     },
   });
 
@@ -99,7 +99,6 @@ export function RecordPaymentDialog({
         mode: 'CASH',
         reference: '',
         notes: '',
-        sendSms: true,
       });
     }
   }, [open, balanceDuePaise, reset]);
@@ -125,7 +124,8 @@ export function RecordPaymentDialog({
         reference: values.reference || undefined,
         notes: values.notes || undefined,
         generateInvoice: true,
-        sendSms: values.sendSms,
+        // Not set up; the receipt goes by email and WhatsApp instead.
+        sendSms: false,
         idempotencyKey,
       });
 
@@ -143,15 +143,17 @@ export function RecordPaymentDialog({
       // counts this as part of the Record click.
       const opened = data.whatsapp ? openWhatsApp(data.whatsapp) : false;
 
-      toast.success('Payment recorded', {
-        description: [
+      // The same frosted confirmation as registration and renewal.
+      showSuccessNotice({
+        title: 'Payment recorded',
+        name: member.fullName,
+        details: [
+          formatINR(amountPaise, { showDecimals: false }),
           data.balance.balanceDuePaise > 0
-            ? `${formatINR(data.balance.balanceDuePaise, { showDecimals: false })} still outstanding.`
-            : 'This member is now fully paid up.',
-          opened && 'WhatsApp is open with the receipt — press Send.',
-        ]
-          .filter(Boolean)
-          .join(' '),
+            ? `${formatINR(data.balance.balanceDuePaise, { showDecimals: false })} still due`
+            : 'Fully paid up',
+        ],
+        note: member.email ? 'Receipt emailed to the member.' : undefined,
       });
 
       onOpenChange(false);
@@ -291,17 +293,20 @@ export function RecordPaymentDialog({
             <Input placeholder="Optional" {...register('notes')} />
           </div>
 
-          <label className="flex cursor-pointer items-center gap-2.5 text-[13px]">
-            <Checkbox
-              checked={watch('sendSms')}
-              onCheckedChange={(checked) =>
-                setValue('sendSms', checked === true)
-              }
-            />
-            <span className="text-muted-foreground">
-              Send a receipt SMS to the member
-            </span>
-          </label>
+          {/* What happens next, instead of an SMS option for a channel
+              that is not set up. */}
+          <ul className="space-y-1 rounded-xl bg-muted/40 px-3.5 py-3 text-[12px] text-muted-foreground">
+            <li className="flex items-center gap-2">
+              <Mail className="size-3.5 shrink-0" />
+              {member.email
+                ? 'The receipt is emailed to the member automatically'
+                : 'No email on file, so no receipt email'}
+            </li>
+            <li className="flex items-center gap-2">
+              <MessageCircle className="size-3.5 shrink-0" />
+              WhatsApp opens with the receipt — you just press Send
+            </li>
+          </ul>
 
           {amountPaise > 0 && (
             <>
