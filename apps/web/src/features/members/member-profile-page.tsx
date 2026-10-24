@@ -36,6 +36,7 @@ import {
   RefreshCw,
   Snowflake,
   Sun,
+  Undo2,
   User,
   Wallet,
 } from 'lucide-react';
@@ -66,7 +67,11 @@ import type { WhatsAppMessage } from '@/lib/whatsapp';
 import { EditMemberDialog } from './edit-member-dialog';
 import { FreezeDialog } from './member-dialogs';
 import { NotifyDialog } from './notify-dialog';
-import { RenewDialog, UnfreezeDialog } from './renew-dialog';
+import {
+  RenewDialog,
+  UndoRenewalDialog,
+  UnfreezeDialog,
+} from './renew-dialog';
 import { cn } from '@/lib/utils';
 
 interface MemberProfile {
@@ -89,6 +94,8 @@ interface MemberProfile {
   status: MemberStatus;
   joinedAt: string;
   qrDataUrl: string;
+  /** The renewal the server would let an owner undo, if any. */
+  undoableRenewalId: string | null;
   balance: {
     totalBilledPaise: number;
     totalPaidPaise: number;
@@ -107,6 +114,7 @@ interface MemberProfile {
     amountPaise: number;
     refundedPaise: number;
     status: PaymentStatus;
+    membershipId: string | null;
     mode: PaymentMode;
     paidAt: string;
     reference: string | null;
@@ -161,6 +169,8 @@ export function MemberProfilePage() {
 
   // Mirrors the API, which refuses /history to other roles.
   const canSeeHistory = hasRole(Role.OWNER, Role.MANAGER);
+  // Undo deletes a payment and its receipt; the API allows only the owner.
+  const canUndoRenewal = hasRole(Role.OWNER);
   // And PATCH /members/:id, which trainers cannot call.
   const canEdit = hasRole(Role.OWNER, Role.MANAGER, Role.RECEPTIONIST);
 
@@ -187,6 +197,7 @@ export function MemberProfilePage() {
   const [smsOpen, setSmsOpen] = React.useState(false);
   const [renewOpen, setRenewOpen] = React.useState(false);
   const [unfreezeOpen, setUnfreezeOpen] = React.useState(false);
+  const [undoOpen, setUndoOpen] = React.useState(false);
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['member', id],
@@ -727,7 +738,7 @@ export function MemberProfilePage() {
                   {data.memberships.map((membership) => (
                     <div
                       key={membership.id}
-                      className="flex items-center gap-3 rounded-xl border border-border px-4 py-3"
+                      className="flex flex-wrap items-center gap-3 rounded-xl border border-border px-4 py-3"
                     >
                       <div className="min-w-0 flex-1">
                         <div className="text-sm font-medium">
@@ -755,6 +766,19 @@ export function MemberProfilePage() {
                       >
                         {membership.status}
                       </Badge>
+
+                      {canUndoRenewal &&
+                        membership.id === data.undoableRenewalId && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => setUndoOpen(true)}
+                          >
+                            <Undo2 />
+                            Undo renewal
+                          </Button>
+                        )}
                     </div>
                   ))}
                 </div>
@@ -809,6 +833,21 @@ export function MemberProfilePage() {
         currentPlanId={null}
         currentEndDate={currentMembership?.endDate ?? null}
         onWhatsAppOpened={whatsapp.setState}
+      />
+
+      <UndoRenewalDialog
+        open={undoOpen}
+        onOpenChange={setUndoOpen}
+        member={data}
+        membership={
+          data.memberships.find((m) => m.id === data.undoableRenewalId) ??
+          null
+        }
+        payments={data.payments.filter(
+          (payment) =>
+            payment.membershipId !== null &&
+            payment.membershipId === data.undoableRenewalId,
+        )}
       />
 
       <UnfreezeDialog
@@ -949,6 +988,7 @@ const ACTION_LABELS: Record<string, string> = {
   MEMBER_UPDATED: 'Details edited',
   MEMBER_DELETED: 'Removed',
   MEMBER_QR_ROTATED: 'QR pass reissued',
+  RENEWAL_UNDONE: 'Renewal undone',
 };
 
 /** Turn a stored field name into something a gym owner would recognise. */
@@ -971,6 +1011,8 @@ const FIELD_LABELS: Record<string, string> = {
   amountPaidPaise: 'Amount paid',
   totalPaise: 'Total',
   plan: 'Plan',
+  period: 'Period',
+  receipt: 'Receipt',
   memberId: 'Member ID',
 };
 

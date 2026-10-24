@@ -46,6 +46,7 @@ import {
 } from '../../services/storage/photo.service.js';
 import { calculateBalance, calculateBill } from '../payments/billing.js';
 import { MEMBER_BALANCES, getDuesSummary } from '../payments/dues.js';
+import { membershipsService } from '../plans/memberships.service.js';
 
 const log = moduleLogger('members');
 
@@ -743,11 +744,17 @@ class MembersService {
       0,
     );
 
-    const qrDataUrl = await generateQrDataUrl(member.memberId, member.qrToken);
+    const [qrDataUrl, undoableRenewalId] = await Promise.all([
+      generateQrDataUrl(member.memberId, member.qrToken),
+      // Lets the profile offer "Undo renewal" only where the server would
+      // accept it. Whether this user may is checked by the route.
+      membershipsService.findUndoableRenewal(member.id),
+    ]);
 
     return {
       ...member,
       qrDataUrl,
+      undoableRenewalId,
       balance: {
         totalBilledPaise: totalBilled,
         totalPaidPaise: totalPaid,

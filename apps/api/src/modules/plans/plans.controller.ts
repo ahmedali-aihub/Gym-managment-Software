@@ -9,6 +9,7 @@ import type {
 import type { Request, Response } from 'express';
 import { whatsappConfig } from '../../config/env.js';
 import { requireUser } from '../../middleware/auth.middleware.js';
+import { actorFromRequest } from '../../services/audit/audit.service.js';
 import {
   chatMessageOrNull,
   chatMessageService,
@@ -130,6 +131,15 @@ export const membershipsController = {
         });
 
     res.status(201).json({ success: true, data: { ...membership, whatsapp } });
+  },
+
+  async undoRenewal(req: Request, res: Response): Promise<void> {
+    requireUser(req);
+    const result = await membershipsService.undoRenewal(
+      req.params.id as string,
+      actorFromRequest(req),
+    );
+    res.json({ success: true, data: result });
   },
 
   async expiring(req: Request, res: Response): Promise<void> {

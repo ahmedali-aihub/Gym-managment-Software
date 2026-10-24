@@ -28,6 +28,11 @@ import {
 } from '../../lib/errors.js';
 import { moduleLogger } from '../../lib/logger.js';
 import { prisma, TRANSACTION_OPTIONS } from '../../lib/prisma.js';
+import { releaseDocumentNumbers } from '../../lib/sequences.js';
+import {
+  auditService,
+  type AuditActor,
+} from '../../services/audit/audit.service.js';
 import { emailService } from '../../services/email/email.service.js';
 import { smsService } from '../../services/sms/sms.service.js';
 import { issueReceipt } from '../invoices/receipt-issuer.js';
@@ -39,6 +44,53 @@ import {
 } from '../payments/billing.js';
 
 const log = moduleLogger('memberships');
+
+/** What decides whether a renewal can be undone. */
+export interface RenewalUndoCandidate {
+  supersededById: string | null;
+  supersedes: { id: string } | null;
+  events: Array<{ type: string }>;
+  payments: Array<{ refundedPaise: number }>;
+}
+
+/**
+ * Why a membership's renewal can NOT be undone, or null when it can.
+ *
+ * Undo exists for the desk's mistakes — a renewal entered for the wrong
+ * member, or a test. Any renewal can be undone, however long ago, as long
+ * as nothing has built on it since: a freeze, an upgrade, a transfer or a
+ * refund each has its own history the undo would silently erase. The caller
+ * separately checks it is the member's newest membership.
+ */
+export function renewalUndoBlocker(
+  membership: RenewalUndoCandidate,
+): string | null {
+  if (!membership.events.some((event) => event.type === 'RENEWED')) {
+    return 'only a renewal can be undone';
+  }
+  if (
+    membership.events.some((event) => event.type !== 'RENEWED') ||
+    membership.supersededById ||
+    membership.supersedes
+  ) {
+    return 'it has been frozen, upgraded or transferred since';
+  }
+  if (membership.payments.some((payment) => payment.refundedPaise > 0)) {
+    return 'a payment on it has been refunded';
+  }
+  return null;
+}
+
+const UNDO_CANDIDATE_SELECT = {
+  id: true,
+  supersededById: true,
+  supersedes: { select: { id: true } },
+  events: { select: { type: true } },
+  payments: {
+    where: { deletedAt: null },
+    select: { refundedPaise: true },
+  },
+} satisfies Prisma.MembershipSelect;
 
 class MembershipsService {
   /**
@@ -694,6 +746,170 @@ class MembershipsService {
     } catch (error) {
       log.error({ err: error, membershipId }, 'Renewal email failed to queue');
     }
+  }
+
+  /**
+   * The member's renewal that can still be undone, or null. The profile uses
+   * it to decide whether to offer the action at all.
+   */
+  async findUndoableRenewal(memberId: string): Promise<string | null> {
+    const newest = await prisma.membership.findFirst({
+      where: { memberId },
+      orderBy: { createdAt: 'desc' },
+      select: UNDO_CANDIDATE_SELECT,
+    });
+    return newest && renewalUndoBlocker(newest) === null ? newest.id : null;
+  }
+
+  /**
+   * Undo a renewal entered by mistake, as if it had never been made.
+   *
+   * Removes the renewal's membership, its payments and their receipts;
+   * gives the previous plan back if the renewal cut it short and it has not
+   * ended since; recomputes the member's status; and returns the receipt
+   * numbers to the counter when nothing has been issued after them.
+   *
+   * Rows are deleted, not soft-deleted: a soft-deleted receipt would keep
+   * holding its unique number, and the point is that the next real receipt
+   * takes it. What was removed, and by whom, goes to the audit trail, which
+   * nothing ever deletes.
+   */
+  async undoRenewal(
+    membershipId: string,
+    actor: AuditActor,
+  ): Promise<{ memberStatus: MemberStatus; releasedReceipts: string[] }> {
+    const membership = await prisma.membership.findUnique({
+      where: { id: membershipId },
+      select: {
+        ...UNDO_CANDIDATE_SELECT,
+        memberId: true,
+        startDate: true,
+        endDate: true,
+        totalPaise: true,
+        plan: { select: { name: true } },
+        member: { select: { status: true, deletedAt: true } },
+        events: { select: { type: true, details: true } },
+        payments: {
+          where: { deletedAt: null },
+          select: { id: true, amountPaise: true, refundedPaise: true },
+        },
+      },
+    });
+    if (!membership || membership.member.deletedAt) {
+      throw new NotFoundError('Membership');
+    }
+
+    const newest = await prisma.membership.findFirst({
+      where: { memberId: membership.memberId },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    });
+    if (newest?.id !== membership.id) {
+      throw new InvalidStateError(
+        "Only the member's latest membership can be undone",
+      );
+    }
+
+    const blocker = renewalUndoBlocker(membership);
+    if (blocker) {
+      throw new InvalidStateError(`This renewal can't be undone: ${blocker}`);
+    }
+
+    const renewed = membership.events.find((event) => event.type === 'RENEWED');
+    const previousId =
+      (renewed?.details as { previousMembershipId?: string | null } | null)
+        ?.previousMembershipId ?? null;
+
+    const paymentIds = membership.payments.map((payment) => payment.id);
+    const invoices = await prisma.invoice.findMany({
+      where: {
+        OR: [{ membershipId }, { paymentId: { in: paymentIds } }],
+      },
+      select: { id: true, invoiceNumber: true },
+    });
+
+    const result = await prisma.$transaction(async (tx) => {
+      await tx.invoice.deleteMany({
+        where: { id: { in: invoices.map((invoice) => invoice.id) } },
+      });
+      await tx.payment.deleteMany({ where: { id: { in: paymentIds } } });
+      // Its events go with it (cascade).
+      await tx.membership.delete({ where: { id: membershipId } });
+
+      // The renewal closed the previous plan early only if it was still
+      // running; one that has ended since stays expired.
+      if (previousId) {
+        const previous = await tx.membership.findUnique({
+          where: { id: previousId },
+          select: { status: true, endDate: true },
+        });
+        if (
+          previous?.status === MembershipStatus.EXPIRED &&
+          previous.endDate >= startOfDay(new Date())
+        ) {
+          await tx.membership.update({
+            where: { id: previousId },
+            data: { status: MembershipStatus.ACTIVE },
+          });
+        }
+      }
+
+      const remaining = await tx.membership.findMany({
+        where: { memberId: membership.memberId },
+        select: { status: true },
+      });
+      const memberStatus = remaining.some(
+        (m) => m.status === MembershipStatus.ACTIVE,
+      )
+        ? MemberStatus.ACTIVE
+        : remaining.some((m) => m.status === MembershipStatus.FROZEN)
+          ? MemberStatus.FROZEN
+          : MemberStatus.EXPIRED;
+
+      await tx.member.update({
+        where: { id: membership.memberId },
+        data: { status: memberStatus },
+      });
+
+      const releasedReceipts = await releaseDocumentNumbers(
+        tx,
+        invoices.map((invoice) => invoice.invoiceNumber),
+      );
+
+      return { memberStatus, releasedReceipts };
+    }, TRANSACTION_OPTIONS);
+
+    // Flat, readable fields: the History tab lists each key of `after`.
+    await auditService.record({
+      action: 'RENEWAL_UNDONE',
+      entityType: 'Member',
+      entityId: membership.memberId,
+      before: { status: membership.member.status },
+      after: {
+        plan: membership.plan.name,
+        period: `${formatDate(membership.startDate)} – ${formatDate(membership.endDate)}`,
+        totalPaise: membership.totalPaise,
+        amountPaidPaise: membership.payments.reduce(
+          (sum, payment) => sum + payment.amountPaise,
+          0,
+        ),
+        receipt: invoices.map((invoice) => invoice.invoiceNumber),
+        status: result.memberStatus,
+      },
+      actor,
+    });
+
+    log.info(
+      {
+        membershipId,
+        memberStatus: result.memberStatus,
+        receipts: invoices.map((invoice) => invoice.invoiceNumber),
+        released: result.releasedReceipts,
+      },
+      'Renewal undone',
+    );
+
+    return result;
   }
 
   /** Memberships expiring within N days — drives reminders and the KPI card. */
