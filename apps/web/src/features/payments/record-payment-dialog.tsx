@@ -24,10 +24,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { WhatsAppSendState } from '@/components/common/whatsapp-send-dialog';
+import type { WhatsAppHandoff } from '@/components/common/whatsapp-send-dialog';
 import { api, getErrorMessage } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
-import { openWhatsApp, type WhatsAppMessage } from '@/lib/whatsapp';
+import type { WhatsAppMessage } from '@/lib/whatsapp';
 
 interface RecordPaymentDialogProps {
   open: boolean;
@@ -40,7 +40,7 @@ interface RecordPaymentDialogProps {
   };
   balanceDuePaise: number;
   /** Told what WhatsApp was opened with, so the page can show the send dialog. */
-  onWhatsAppOpened?: (state: WhatsAppSendState) => void;
+  onWhatsAppReady?: (handoff: WhatsAppHandoff) => void;
 }
 
 interface PaymentForm {
@@ -63,7 +63,7 @@ export function RecordPaymentDialog({
   onOpenChange,
   member,
   balanceDuePaise,
-  onWhatsAppOpened,
+  onWhatsAppReady,
 }: RecordPaymentDialogProps) {
   const queryClient = useQueryClient();
 
@@ -139,10 +139,6 @@ export function RecordPaymentDialog({
       void queryClient.invalidateQueries({ queryKey: ['members'] });
       void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
 
-      // WhatsApp opens with the receipt from here, while the browser still
-      // counts this as part of the Record click.
-      const opened = data.whatsapp ? openWhatsApp(data.whatsapp) : false;
-
       // The same frosted confirmation as registration and renewal.
       showSuccessNotice({
         title: 'Payment recorded',
@@ -158,12 +154,13 @@ export function RecordPaymentDialog({
 
       onOpenChange(false);
 
+      // Opened by the profile two seconds from now, once the confirmation
+      // has been seen — on a phone WhatsApp would otherwise cover it.
       if (data.whatsapp) {
-        onWhatsAppOpened?.({
+        onWhatsAppReady?.({
           title: 'Payment receipt',
           recipient: member.fullName,
           message: data.whatsapp,
-          opened,
         });
       }
     },

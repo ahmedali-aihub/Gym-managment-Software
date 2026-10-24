@@ -41,10 +41,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { showSuccessNotice } from '@/components/common/success-notice';
-import type { WhatsAppSendState } from '@/components/common/whatsapp-send-dialog';
+import type { WhatsAppHandoff } from '@/components/common/whatsapp-send-dialog';
 import { api, getErrorMessage, getFieldErrors } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
-import { openWhatsApp, type WhatsAppMessage } from '@/lib/whatsapp';
+import type { WhatsAppMessage } from '@/lib/whatsapp';
 
 interface Plan {
   id: string;
@@ -249,11 +249,6 @@ export function RegisterMemberPage() {
       void queryClient.invalidateQueries({ queryKey: ['analytics'] });
       void queryClient.invalidateQueries({ queryKey: ['today-collection'] });
 
-      // WhatsApp opens on the member's chat with the welcome typed. Done
-      // here, not after navigating: the browser only allows a new tab while
-      // this still counts as part of the Register click.
-      const opened = data.whatsapp ? openWhatsApp(data.whatsapp) : false;
-
       // The one moment the desk should feel land: a member has joined. The
       // small print says only what went out by email — SMS is not offered
       // on this form, and the WhatsApp dialog on the profile speaks for
@@ -270,16 +265,20 @@ export function RegisterMemberPage() {
           : undefined,
       });
 
-      const whatsappSend: WhatsAppSendState | undefined = data.whatsapp
+      // The profile opens WhatsApp with the welcome two seconds after this
+      // moment — counted from here, so loading the profile does not stretch
+      // it — once the confirmation has been seen.
+      const whatsappSend: WhatsAppHandoff | undefined = data.whatsapp
         ? {
             title: 'Welcome message',
             recipient: data.member.fullName,
             message: data.whatsapp,
-            opened,
           }
         : undefined;
 
-      navigate(`/members/${data.member.id}`, { state: { whatsappSend } });
+      navigate(`/members/${data.member.id}`, {
+        state: { whatsappSend, handedAt: Date.now() },
+      });
     },
 
     onError: (error) => {

@@ -32,6 +32,20 @@ export interface WhatsAppSendState {
   opened: boolean;
 }
 
+/** A message ready to send, before WhatsApp has been opened with it. */
+export type WhatsAppHandoff = Omit<WhatsAppSendState, 'opened'>;
+
+/**
+ * How long a confirmation stays on screen before WhatsApp takes over.
+ *
+ * On a phone, opening WhatsApp leaves the browser at once, so the desk
+ * never saw "Membership renewed". Two seconds is long enough to read the
+ * notice and short enough to stay inside the window in which browsers still
+ * count the open as part of the tap. If a slow connection pushes it past
+ * that and the browser blocks it, the dialog offers an Open WhatsApp button.
+ */
+export const WHATSAPP_HANDOFF_DELAY_MS = 2000;
+
 /**
  * Fetch a message, open WhatsApp with it, and keep what happened for the
  * dialog. Opening straight from the click matters: browsers only allow a
@@ -40,6 +54,22 @@ export interface WhatsAppSendState {
 export function useWhatsAppSend() {
   const [state, setState] = React.useState<WhatsAppSendState | null>(null);
   const [sending, setSending] = React.useState(false);
+  const handoffTimer = React.useRef<number | undefined>(undefined);
+
+  /**
+   * Open WhatsApp after the confirmation has had its moment, then show the
+   * dialog with what happened. A second call replaces a pending one, so a
+   * hand-off cannot open WhatsApp twice.
+   */
+  function openLater(
+    handoff: WhatsAppHandoff,
+    delayMs: number = WHATSAPP_HANDOFF_DELAY_MS,
+  ) {
+    window.clearTimeout(handoffTimer.current);
+    handoffTimer.current = window.setTimeout(() => {
+      setState({ ...handoff, opened: openWhatsApp(handoff.message) });
+    }, delayMs);
+  }
 
   async function send(
     load: () => Promise<WhatsAppMessage>,
@@ -56,7 +86,7 @@ export function useWhatsAppSend() {
     }
   }
 
-  return { state, setState, sending, send };
+  return { state, setState, sending, send, openLater };
 }
 
 /**

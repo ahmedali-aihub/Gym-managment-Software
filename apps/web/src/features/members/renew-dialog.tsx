@@ -23,7 +23,7 @@ import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { showSuccessNotice } from '@/components/common/success-notice';
-import type { WhatsAppSendState } from '@/components/common/whatsapp-send-dialog';
+import type { WhatsAppHandoff } from '@/components/common/whatsapp-send-dialog';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -45,7 +45,7 @@ import {
 } from '@/components/ui/select';
 import { api, getErrorMessage } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
-import { openWhatsApp, type WhatsAppMessage } from '@/lib/whatsapp';
+import type { WhatsAppMessage } from '@/lib/whatsapp';
 
 interface Plan {
   id: string;
@@ -76,7 +76,7 @@ export function RenewDialog({
   member,
   currentPlanId,
   currentEndDate,
-  onWhatsAppOpened,
+  onWhatsAppReady,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -88,8 +88,11 @@ export function RenewDialog({
   };
   currentPlanId?: string | null;
   currentEndDate?: string | null;
-  /** Called with the renewal message, so the profile can offer it again. */
-  onWhatsAppOpened?: (state: WhatsAppSendState) => void;
+  /**
+   * Handed the renewal message once the renewal is saved. The profile opens
+   * WhatsApp with it a moment later, after the confirmation has been seen.
+   */
+  onWhatsAppReady?: (handoff: WhatsAppHandoff) => void;
 }) {
   const queryClient = useQueryClient();
   // A start date typed by hand, overriding the automatic one. Null until
@@ -203,10 +206,6 @@ export function RenewDialog({
       void queryClient.invalidateQueries({ queryKey: ['analytics'] });
       void queryClient.invalidateQueries({ queryKey: ['today-collection'] });
 
-      // WhatsApp opens with the renewal message from here, while the
-      // browser still counts this as part of the Renew click.
-      const opened = data.whatsapp ? openWhatsApp(data.whatsapp) : false;
-
       showSuccessNotice({
         title: 'Membership renewed',
         name: member.fullName,
@@ -218,12 +217,13 @@ export function RenewDialog({
       });
       onOpenChange(false);
 
+      // Not opened here: on a phone WhatsApp would cover the confirmation
+      // before it could be read. The profile opens it two seconds later.
       if (data.whatsapp) {
-        onWhatsAppOpened?.({
+        onWhatsAppReady?.({
           title: 'Renewal confirmation',
           recipient: member.fullName,
           message: data.whatsapp,
-          opened,
         });
       }
     },

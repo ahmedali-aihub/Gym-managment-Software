@@ -46,7 +46,8 @@ import { EmptyState, ErrorState } from '@/components/common/states';
 import {
   WhatsAppSendDialog,
   useWhatsAppSend,
-  type WhatsAppSendState,
+  WHATSAPP_HANDOFF_DELAY_MS,
+  type WhatsAppHandoff,
 } from '@/components/common/whatsapp-send-dialog';
 import { MemberAvatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -183,10 +184,16 @@ export function MemberProfilePage() {
   // what was typed there. The navigation state is cleared at once, so a
   // refresh does not bring the dialog back.
   React.useEffect(() => {
-    const handed = (location.state as { whatsappSend?: WhatsAppSendState } | null)
-      ?.whatsappSend;
-    if (handed) {
-      whatsapp.setState(handed);
+    const arrived = location.state as {
+      whatsappSend?: WhatsAppHandoff;
+      handedAt?: number;
+    } | null;
+    if (arrived?.whatsappSend) {
+      const waited = Date.now() - (arrived.handedAt ?? Date.now());
+      whatsapp.openLater(
+        arrived.whatsappSend,
+        Math.max(0, WHATSAPP_HANDOFF_DELAY_MS - waited),
+      );
       navigate(location.pathname, { replace: true, state: null });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -794,7 +801,7 @@ export function MemberProfilePage() {
         onOpenChange={setPaymentOpen}
         member={data}
         balanceDuePaise={data.balance.balanceDuePaise}
-        onWhatsAppOpened={whatsapp.setState}
+        onWhatsAppReady={whatsapp.openLater}
       />
 
       <NotifyDialog
@@ -832,7 +839,7 @@ export function MemberProfilePage() {
         member={data}
         currentPlanId={null}
         currentEndDate={currentMembership?.endDate ?? null}
-        onWhatsAppOpened={whatsapp.setState}
+        onWhatsAppReady={whatsapp.openLater}
       />
 
       <UndoRenewalDialog
