@@ -80,8 +80,14 @@ export function RenewDialog({
     enabled: open,
   });
 
-  const { register, handleSubmit, watch, setValue, reset } =
-    useForm<RenewForm>();
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    reset,
+    formState: { errors },
+  } = useForm<RenewForm>();
 
   React.useEffect(() => {
     if (!open) return;
@@ -104,11 +110,11 @@ export function RenewDialog({
 
   const plan = plans?.find((p) => p.id === planId);
 
-  // Prefill the full price once a plan is chosen.
+  // Each plan picked fills in its own price, ready to be lowered to what
+  // the member is actually paying. Filling only an empty box left ₹2,000 in
+  // place after switching from 1 Month to 3 Months.
   React.useEffect(() => {
-    if (plan && !amountPaidRupees) {
-      setValue('amountPaidRupees', String(plan.pricePaise / 100));
-    }
+    if (plan) setValue('amountPaidRupees', String(plan.pricePaise / 100));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [planId]);
 
@@ -129,7 +135,9 @@ export function RenewDialog({
     ? calculateExpiryDate(startDate, plan.durationDays)
     : null;
 
-  const balance = plan
+  // The amount typed is the price agreed: anything below the plan price is
+  // a discount, not a due (the owner's rule, same as registration).
+  const discount = plan
     ? Math.max(
         0,
         plan.pricePaise - rupeesToPaise(Number(amountPaidRupees) || 0),
@@ -145,6 +153,8 @@ export function RenewDialog({
         payment: {
           amountPaid: rupeesToPaise(Number(values.amountPaidRupees) || 0),
           mode: values.paymentMode,
+          discountAmount: discount,
+          discountReason: discount ? 'Amount agreed at the desk' : undefined,
           reference: values.reference || undefined,
         },
         sendSms: values.sendSms,
@@ -243,13 +253,24 @@ export function RenewDialog({
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label required className="text-[13px]">
-                Amount collected
+                Amount paying
               </Label>
               <Input
                 inputMode="decimal"
                 icon={<IndianRupee />}
-                {...register('amountPaidRupees')}
+                error={Boolean(errors.amountPaidRupees)}
+                {...register('amountPaidRupees', {
+                  validate: (value) =>
+                    !plan ||
+                    rupeesToPaise(Number(value) || 0) <= plan.pricePaise ||
+                    'Cannot be more than the plan price',
+                })}
               />
+              {errors.amountPaidRupees && (
+                <p className="text-[12px] font-medium text-destructive">
+                  {errors.amountPaidRupees.message}
+                </p>
+              )}
             </div>
 
             <div className="space-y-1.5">
@@ -297,11 +318,11 @@ export function RenewDialog({
                     {formatDate(startDate)} – {formatDate(newExpiry)}
                   </span>
                 </div>
-                {balance > 0 && (
+                {discount > 0 && (
                   <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Balance due</span>
-                    <span className="tabular font-semibold text-destructive">
-                      {formatINR(balance, { showDecimals: false })}
+                    <span className="text-muted-foreground">Discount</span>
+                    <span className="tabular font-semibold text-success">
+                      {formatINR(discount, { showDecimals: false })} · nothing due
                     </span>
                   </div>
                 )}
