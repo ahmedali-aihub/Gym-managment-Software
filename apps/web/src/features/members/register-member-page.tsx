@@ -40,6 +40,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { showSuccessNotice } from '@/components/common/success-notice';
 import type { WhatsAppSendState } from '@/components/common/whatsapp-send-dialog';
 import { api, getErrorMessage, getFieldErrors } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
@@ -253,19 +254,20 @@ export function RegisterMemberPage() {
       // this still counts as part of the Register click.
       const opened = data.whatsapp ? openWhatsApp(data.whatsapp) : false;
 
-      // What actually goes out. SMS is not offered on this form, so it must
-      // not be promised, and a "pay later" registration has no receipt.
+      // The one moment the desk should feel land: a member has joined. The
+      // small print says only what went out by email — SMS is not offered
+      // on this form, and the WhatsApp dialog on the profile speaks for
+      // itself, so repeating it here would be noise.
       const withReceipt = Number(values.amountPaidRupees) > 0;
-      const notes = [
-        data.member.email &&
-          `Welcome email${withReceipt ? ' with the receipt' : ''} sent.`,
-        data.whatsapp &&
-          (opened
-            ? 'WhatsApp is open — press Send.'
-            : 'Open WhatsApp from the profile to send the welcome.'),
-      ].filter(Boolean);
-      toast.success(`${data.member.memberId} registered`, {
-        description: notes.join(' '),
+      showSuccessNotice({
+        title: 'Member registered',
+        name: data.member.fullName,
+        details: [selectedPlan?.name, `ID ${data.member.memberId}`].filter(
+          (detail): detail is string => Boolean(detail),
+        ),
+        note: data.member.email
+          ? `Welcome email${withReceipt ? ' with the receipt' : ''} sent.`
+          : undefined,
       });
 
       const whatsappSend: WhatsAppSendState | undefined = data.whatsapp
