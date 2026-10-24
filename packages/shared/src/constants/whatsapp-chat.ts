@@ -152,6 +152,58 @@ export function receiptChatMessage(v: ReceiptChatVariables): string {
   return lines.join('\n');
 }
 
+export interface RenewalChatVariables extends Signature {
+  /** First name. */
+  name: string;
+  memberId: string;
+  plan: string;
+  validFrom: string;
+  validUntil: string;
+  /** "4,500" — omitted when nothing was paid (a fully discounted renewal). */
+  amountPaid?: string;
+  paymentMode?: string;
+  receiptNumber?: string;
+  receiptUrl?: string;
+}
+
+export function renewalChatMessage(v: RenewalChatVariables): string {
+  const lines = [
+    ...letterhead(v.gymName, 'Membership Renewal'),
+    `Dear ${v.name},`,
+    '',
+    `Thank you for renewing your membership with *${v.gymName}*. Here are your new membership details.`,
+    '',
+    `*Member ID:* ${v.memberId}`,
+    `*Plan:* ${v.plan}`,
+    `*Start Date:* ${v.validFrom}`,
+    `*Valid Till:* ${v.validUntil}`,
+  ];
+
+  const payment: string[] = [];
+  if (v.amountPaid) {
+    payment.push(
+      `*Amount Paid:* ₹${v.amountPaid}${v.paymentMode ? ` (${v.paymentMode})` : ''}`,
+    );
+  }
+  if (v.receiptNumber && v.receiptUrl) {
+    payment.push(`*Receipt No:* ${v.receiptNumber}`);
+  }
+  if (payment.length > 0) lines.push('', ...payment);
+
+  if (v.receiptUrl) {
+    lines.push('', '*Download your receipt (PDF):*', v.receiptUrl);
+  }
+
+  lines.push(
+    '',
+    'We look forward to seeing you at the gym.',
+    '',
+    ...signOff(v, callUs(v.gymPhone)),
+  );
+
+  return lines.join('\n');
+}
+
 export interface ReminderChatVariables extends Signature {
   kind: 'EXPIRY_REMINDER' | 'PAYMENT_DUE';
   name: string;

@@ -2,6 +2,7 @@ import {
   greetingName,
   receiptChatMessage,
   reminderChatMessage,
+  renewalChatMessage,
   welcomeChatMessage,
   whatsAppPhone,
 } from '@azf/shared';
@@ -132,6 +133,43 @@ describe('receiptChatMessage', () => {
     expect(withPlan).toContain('*Plan:* FITNESS 1M\n*Valid Till:* 21 Nov 2026');
 
     expect(receiptChatMessage(base)).not.toMatch(/Plan:|Valid Till/);
+  });
+});
+
+describe('renewalChatMessage', () => {
+  const base = {
+    ...signature,
+    name: 'Rahul',
+    memberId: '6374',
+    plan: 'FITNESS 3M',
+    validFrom: '13 Jan 2027',
+    validUntil: '12 Apr 2027',
+  };
+
+  it('confirms the renewal with the new period, payment and receipt', () => {
+    const text = renewalChatMessage({
+      ...base,
+      amountPaid: '3,000',
+      paymentMode: 'UPI',
+      receiptNumber: 'RCPT/2026-27/0002',
+      receiptUrl: 'https://example.com/api/r/abc.def',
+      gymPhone: '+91 93912 10744',
+    });
+    expect(text.startsWith('*A TO Z FITNESS*\n_Membership Renewal_')).toBe(true);
+    expect(text).toContain('Dear Rahul,');
+    expect(text).toContain('Thank you for renewing your membership');
+    expect(text).toContain('*Start Date:* 13 Jan 2027\n*Valid Till:* 12 Apr 2027');
+    expect(text).toContain('*Amount Paid:* ₹3,000 (UPI)');
+    expect(text).toContain('*Receipt No:* RCPT/2026-27/0002');
+    expect(text).toContain('*Download your receipt (PDF):*\nhttps://example.com/api/r/abc.def');
+    expect(text).toContain('call us on +91 93912 10744');
+    expect(text).not.toMatch(/\p{Extended_Pictographic}/u);
+  });
+
+  it('leaves out payment and receipt lines when nothing was paid', () => {
+    const text = renewalChatMessage(base);
+    expect(text).not.toMatch(/Amount Paid|Receipt|undefined/);
+    expect(text.endsWith('Warm regards,\n*Team A to Z Fitness*\nMehdipatnam, Hyderabad')).toBe(true);
   });
 });
 
