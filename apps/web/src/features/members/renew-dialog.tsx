@@ -1,15 +1,26 @@
 import {
   calculateExpiryDate,
   formatDate,
+  formatDateLong,
   formatINR,
   rupeesToPaise,
   toDateInputValue,
 } from '@azf/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, IndianRupee, RefreshCw, Sun } from 'lucide-react';
+import {
+  Check,
+  IndianRupee,
+  Mail,
+  MessageCircle,
+  Pencil,
+  RefreshCw,
+  Sun,
+} from 'lucide-react';
 import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
+import { showSuccessNotice } from '@/components/common/success-notice';
+import type { WhatsAppSendState } from '@/components/common/whatsapp-send-dialog';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -31,6 +42,7 @@ import {
 } from '@/components/ui/select';
 import { api, getErrorMessage } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
+import { openWhatsApp, type WhatsAppMessage } from '@/lib/whatsapp';
 
 interface Plan {
   id: string;
@@ -45,7 +57,6 @@ interface RenewForm {
   amountPaidRupees: string;
   paymentMode: 'CASH' | 'UPI' | 'CARD' | 'NET_BANKING';
   reference: string;
-  sendSms: boolean;
 }
 
 /**
@@ -62,14 +73,25 @@ export function RenewDialog({
   member,
   currentPlanId,
   currentEndDate,
+  onWhatsAppOpened,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  member: { id: string; memberId: string; fullName: string };
+  member: {
+    id: string;
+    memberId: string;
+    fullName: string;
+    email?: string | null;
+  };
   currentPlanId?: string | null;
   currentEndDate?: string | null;
+  /** Called with the renewal message, so the profile can offer it again. */
+  onWhatsAppOpened?: (state: WhatsAppSendState) => void;
 }) {
   const queryClient = useQueryClient();
+  // A start date typed by hand, overriding the automatic one. Null until
+  // the desk chooses to change it.
+  const [customStart, setCustomStart] = React.useState<string | null>(null);
 
   const { data: plans } = useQuery({
     queryKey: ['plans-active'],
@@ -99,8 +121,8 @@ export function RenewDialog({
       amountPaidRupees: '',
       paymentMode: 'CASH',
       reference: '',
-      sendSms: true,
     });
+    setCustomStart(null);
   }, [open, currentPlanId, reset]);
 
   const planId = watch('planId');
@@ -123,13 +145,14 @@ export function RenewDialog({
     : false;
 
   const startDate = React.useMemo(() => {
+    if (customStart) return new Date(`${customStart}T00:00:00`);
     if (continueFromExpiry && expiryStillAhead && currentEndDate) {
       const next = new Date(currentEndDate);
       next.setDate(next.getDate() + 1);
       return next;
     }
     return new Date();
-  }, [continueFromExpiry, expiryStillAhead, currentEndDate]);
+  }, [customStart, continueFromExpiry, expiryStillAhead, currentEndDate]);
 
   const newExpiry = plan
     ? calculateExpiryDate(startDate, plan.durationDays)
@@ -146,10 +169,15 @@ export function RenewDialog({
 
   const mutation = useMutation({
     mutationFn: async (values: RenewForm) => {
-      await api.post('/memberships/renew', {
+      const response = await api.post<{
+        data: { id: string; whatsapp: WhatsAppMessage | null };
+      }>('/memberships/renew', {
         memberId: member.id,
         planId: values.planId,
         continueFromExpiry: values.continueFromExpiry,
+        // Only when changed by hand; otherwise the server works it out the
+        // same way this dialog previews it.
+        ...(customStart ? { startDate: customStart } : {}),
         payment: {
           amountPaid: rupeesToPaise(Number(values.amountPaidRupees) || 0),
           mode: values.paymentMode,
@@ -157,11 +185,14 @@ export function RenewDialog({
           discountReason: discount ? 'Amount agreed at the desk' : undefined,
           reference: values.reference || undefined,
         },
-        sendSms: values.sendSms,
+        // SMS is not set up (Indian SMS needs DLT registration); the member
+        // hears by email and WhatsApp instead.
+        sendSms: false,
       });
+      return response.data.data;
     },
 
-    onSuccess: () => {
+    onSuccess: (data) => {
       void queryClient.invalidateQueries({ queryKey: ['member', member.id] });
       void queryClient.invalidateQueries({ queryKey: ['members'] });
       void queryClient.invalidateQueries({ queryKey: ['member-stats'] });
@@ -169,8 +200,29 @@ export function RenewDialog({
       void queryClient.invalidateQueries({ queryKey: ['analytics'] });
       void queryClient.invalidateQueries({ queryKey: ['today-collection'] });
 
-      toast.success('Membership renewed');
+      // WhatsApp opens with the renewal message from here, while the
+      // browser still counts this as part of the Renew click.
+      const opened = data.whatsapp ? openWhatsApp(data.whatsapp) : false;
+
+      showSuccessNotice({
+        title: 'Membership renewed',
+        name: member.fullName,
+        details: [
+          plan?.name,
+          newExpiry && `Valid till ${formatDateLong(newExpiry)}`,
+        ].filter((detail): detail is string => Boolean(detail)),
+        note: member.email ? 'Receipt emailed to the member.' : undefined,
+      });
       onOpenChange(false);
+
+      if (data.whatsapp) {
+        onWhatsAppOpened?.({
+          title: 'Renewal confirmation',
+          recipient: member.fullName,
+          message: data.whatsapp,
+          opened,
+        });
+      }
     },
 
     onError: (error) => toast.error(getErrorMessage(error)),
@@ -230,8 +282,9 @@ export function RenewDialog({
             </div>
           </div>
 
-          {/* Early-renewal choice, shown only when it actually applies. */}
-          {expiryStillAhead && (
+          {/* Early-renewal choice, shown only when it actually applies —
+              and not once a start date has been typed by hand. */}
+          {expiryStillAhead && !customStart && (
             <label className="flex cursor-pointer items-start gap-2.5 rounded-xl bg-info/[0.07] px-4 py-3">
               <Checkbox
                 checked={continueFromExpiry}
@@ -312,12 +365,54 @@ export function RenewDialog({
             <>
               <Separator />
               <div className="space-y-1.5 text-sm">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-3">
                   <span className="text-muted-foreground">New period</span>
-                  <span className="tabular font-medium">
-                    {formatDate(startDate)} – {formatDate(newExpiry)}
+                  <span className="flex items-center gap-2">
+                    <span className="tabular font-medium">
+                      {formatDate(startDate)} – {formatDate(newExpiry)}
+                    </span>
+                    {!customStart && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCustomStart(toDateInputValue(startDate))
+                        }
+                        className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[12px] font-medium text-primary transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <Pencil className="size-3" />
+                        Change
+                      </button>
+                    )}
                   </span>
                 </div>
+
+                {/* The automatic dates are right almost every time; this is
+                    for the exception, like a member who paid last week and
+                    is only being entered now. The end follows the plan. */}
+                {customStart && (
+                  <div className="space-y-1.5 rounded-xl bg-muted/50 px-3 py-3">
+                    <Label className="text-[13px]">Starts on</Label>
+                    <Input
+                      type="date"
+                      value={customStart}
+                      onChange={(event) =>
+                        setCustomStart(event.target.value || null)
+                      }
+                    />
+                    <div className="flex items-center justify-between text-[12px] text-muted-foreground">
+                      <span>
+                        Ends {formatDate(newExpiry)} · {plan?.durationDays} days
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setCustomStart(null)}
+                        className="font-medium text-primary hover:underline"
+                      >
+                        Use automatic dates
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {discount > 0 && (
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Discount</span>
@@ -330,17 +425,23 @@ export function RenewDialog({
             </>
           )}
 
-          <label className="flex cursor-pointer items-center gap-2.5 text-[13px]">
-            <Checkbox
-              checked={watch('sendSms')}
-              onCheckedChange={(checked) =>
-                setValue('sendSms', checked === true)
-              }
-            />
-            <span className="text-muted-foreground">
-              Send confirmation SMS with the new dates
-            </span>
-          </label>
+          {/* What happens next, instead of an SMS option for a channel
+              that is not set up. */}
+          <div className="rounded-xl bg-muted/40 px-3.5 py-3">
+            <p className="text-[13px] font-medium">After you renew</p>
+            <ul className="mt-1.5 space-y-1 text-[12px] text-muted-foreground">
+              <li className="flex items-center gap-2">
+                <Mail className="size-3.5 shrink-0" />
+                {member.email
+                  ? 'The receipt is emailed to the member automatically'
+                  : 'No email on file, so no receipt email'}
+              </li>
+              <li className="flex items-center gap-2">
+                <MessageCircle className="size-3.5 shrink-0" />
+                WhatsApp opens with the renewal message — you just press Send
+              </li>
+            </ul>
+          </div>
 
           <DialogFooter>
             <Button

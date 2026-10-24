@@ -808,6 +808,7 @@ export function MemberProfilePage() {
         member={data}
         currentPlanId={null}
         currentEndDate={currentMembership?.endDate ?? null}
+        onWhatsAppOpened={whatsapp.setState}
       />
 
       <UnfreezeDialog
