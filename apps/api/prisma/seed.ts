@@ -276,12 +276,12 @@ async function main(): Promise<void> {
 
   // Weighted so popular plans dominate, as they would in reality.
   const planWeights = [
-    { plan: plans[0]!, weight: 30 }, // Monthly
-    { plan: plans[1]!, weight: 28 }, // Quarterly
-    { plan: plans[2]!, weight: 18 }, // Half-yearly
-    { plan: plans[3]!, weight: 12 }, // Yearly
-    { plan: plans[4]!, weight: 8 },  // Student
-    { plan: plans[5]!, weight: 4 },  // Couple
+    { plan: plans[0]!, weight: 30 }, // 1 month
+    { plan: plans[1]!, weight: 8 },  // 2 months
+    { plan: plans[2]!, weight: 28 }, // 3 months
+    { plan: plans[3]!, weight: 6 },  // 4 months
+    { plan: plans[4]!, weight: 14 }, // 6 months
+    { plan: plans[5]!, weight: 14 }, // 12 months
   ];
   const totalWeight = planWeights.reduce((sum, p) => sum + p.weight, 0);
 
