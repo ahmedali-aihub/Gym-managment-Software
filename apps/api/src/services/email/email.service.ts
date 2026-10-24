@@ -65,6 +65,7 @@ class EmailService {
     // Gym identity is merged in here rather than asked of every caller —
     // every template needs it and no caller should have to remember.
     const merged: Record<string, string | number> = {
+      ...template.defaults,
       gymName: gymConfig.name,
       gymAddress: [gymConfig.addressLine1, gymConfig.addressLine2]
         .filter(Boolean)
@@ -276,10 +277,10 @@ class EmailService {
  */
 function textFromLog(emailLog: EmailLog): string {
   const template = EMAIL_TEMPLATES[emailLog.templateKey];
-  const variables = (emailLog.variables ?? {}) as Record<
-    string,
-    string | number
-  >;
+  const variables = {
+    ...template.defaults,
+    ...((emailLog.variables ?? {}) as Record<string, string | number>),
+  };
   return renderEmailTemplate(template.text, variables, false);
 }
 

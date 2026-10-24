@@ -249,6 +249,13 @@ class PaymentsService {
         where: { paymentId: payment.id },
         select: { id: true, invoiceNumber: true },
       });
+      // What the payment was for, so the email can say until when.
+      const membership = payment.membershipId
+        ? await prisma.membership.findUnique({
+            where: { id: payment.membershipId },
+            select: { endDate: true, plan: { select: { name: true } } },
+          })
+        : null;
 
       await emailService.send({
         to: email,
@@ -259,6 +266,12 @@ class PaymentsService {
           name: fullName,
           memberId: memberCode,
           receiptNo: invoice?.invoiceNumber ?? '—',
+          ...(membership
+            ? {
+                plan: membership.plan.name,
+                validUntil: formatDate(membership.endDate),
+              }
+            : {}),
           paidDate: formatDate(payment.paidAt),
           mode: PAYMENT_MODE_LABELS[payment.mode] ?? payment.mode,
           amount: paiseToRupees(payment.amountPaise).toLocaleString('en-IN'),

@@ -26,6 +26,12 @@ export interface EmailTemplateDefinition {
   /** Plain-text fallback with the same {{variables}}. */
   text: string;
   variables: readonly string[];
+  /**
+   * Values used when a caller does not pass a variable — for variables added
+   * after emails were already logged with the older set, so a resend of one
+   * of those never shows a raw {{placeholder}}.
+   */
+  defaults?: Readonly<Record<string, string>>;
   description: string;
 }
 
@@ -150,14 +156,16 @@ Bring your member ID on your first visit. Questions? Call {{gymPhone}}.
     label: 'Payment Receipt',
     subject: 'Receipt {{receiptNo}} — {{gymName}}',
     body: shell(
-      `${header('Payment received')}
+      `${header('{{headline}}')}
 <tr><td style="padding:4px 28px 0;">
 <p style="margin:0 0 20px;font-size:15px;line-height:23px;color:${INK};">
-Hi {{name}}, we have received your payment. The receipt is attached.
+Hi {{name}}, {{intro}} The receipt is attached.
 </p>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px solid ${BORDER};border-bottom:1px solid ${BORDER};margin-bottom:20px;">
 ${row('Receipt no.', '{{receiptNo}}')}
 ${row('Member ID', '{{memberId}}')}
+${row('Plan', '{{plan}}')}
+${row('Valid till', '{{validUntil}}')}
 ${row('Paid on', '{{paidDate}}')}
 ${row('Method', '{{mode}}')}
 ${row('Amount', 'Rs. {{amount}}', true)}
@@ -168,12 +176,14 @@ Questions about this payment? Call us on {{gymPhone}}.
 </p>
 </td></tr>`,
     ),
-    text: `Payment received — {{gymName}}
+    text: `{{headline}} — {{gymName}}
 
-Hi {{name}}, we have received your payment.
+Hi {{name}}, {{intro}}
 
 Receipt no.:  {{receiptNo}}
 Member ID:    {{memberId}}
+Plan:         {{plan}}
+Valid till:   {{validUntil}}
 Paid on:      {{paidDate}}
 Method:       {{mode}}
 Amount:       Rs. {{amount}}
@@ -183,9 +193,13 @@ The receipt is attached as a PDF.
 
 {{gymName}} · {{gymPhone}}`,
     variables: [
+      'headline',
+      'intro',
       'name',
       'memberId',
       'receiptNo',
+      'plan',
+      'validUntil',
       'paidDate',
       'mode',
       'amount',
@@ -195,7 +209,15 @@ The receipt is attached as a PDF.
       'gymPhone',
       'gymEmail',
     ],
-    description: 'Sent when a payment is recorded.',
+    // Also the renewal confirmation: a renewal is a payment with a new
+    // period, and passes its own headline and intro.
+    defaults: {
+      headline: 'Payment received',
+      intro: 'we have received your payment.',
+      plan: '—',
+      validUntil: '—',
+    },
+    description: 'Sent when a payment is recorded or a membership renewed.',
   },
 
   EXPIRY_REMINDER: {

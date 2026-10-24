@@ -5,8 +5,10 @@ import type {
   UpgradeMembershipInput,
 } from '@azf/shared';
 import {
+  EmailTemplateKey,
   MemberStatus,
   MembershipStatus,
+  PAYMENT_MODE_LABELS,
   PaymentStatus,
   SmsTemplateKey,
   addDays,
@@ -26,8 +28,10 @@ import {
 } from '../../lib/errors.js';
 import { moduleLogger } from '../../lib/logger.js';
 import { prisma, TRANSACTION_OPTIONS } from '../../lib/prisma.js';
+import { emailService } from '../../services/email/email.service.js';
 import { smsService } from '../../services/sms/sms.service.js';
 import { issueReceipt } from '../invoices/receipt-issuer.js';
+import { paymentsService } from '../payments/payments.service.js';
 import {
   calculateBill,
   calculateProratedCredit,
@@ -593,6 +597,15 @@ class MembershipsService {
       'Membership renewed',
     );
 
+    // The confirmation, with the receipt attached, whenever there is an
+    // address to send it to — no checkbox, as with registration.
+    if (member.email) {
+      runInBackground(
+        this.sendRenewalEmail(member, created.id),
+        'renewal email',
+      );
+    }
+
     if (input.sendSms) {
       runInBackground(
         smsService
@@ -621,6 +634,66 @@ class MembershipsService {
     }
 
     return created;
+  }
+
+  /**
+   * The renewal confirmation email: the receipt template, headed "Membership
+   * renewed", with the new plan, its end date and the receipt PDF attached.
+   * Never throws — the renewal is already saved.
+   */
+  private async sendRenewalEmail(
+    member: { id: string; memberId: string; fullName: string; email: string | null },
+    membershipId: string,
+  ): Promise<void> {
+    if (!member.email) return;
+    try {
+      const membership = await prisma.membership.findUnique({
+        where: { id: membershipId },
+        select: {
+          endDate: true,
+          plan: { select: { name: true } },
+          payments: {
+            where: { deletedAt: null },
+            orderBy: { paidAt: 'asc' },
+            take: 1,
+            select: {
+              amountPaise: true,
+              mode: true,
+              paidAt: true,
+              invoice: { select: { id: true, invoiceNumber: true } },
+            },
+          },
+        },
+      });
+      if (!membership) return;
+
+      const payment = membership.payments[0];
+      const balance = await paymentsService.getMemberBalance(member.id);
+      const rupees = (paise: number) =>
+        paiseToRupees(paise).toLocaleString('en-IN');
+
+      await emailService.send({
+        to: member.email,
+        templateKey: EmailTemplateKey.RECEIPT,
+        memberId: member.id,
+        attachInvoiceId: payment?.invoice?.id,
+        variables: {
+          headline: 'Membership renewed',
+          intro: 'thank you for renewing your membership.',
+          name: member.fullName.split(' ')[0] ?? member.fullName,
+          memberId: member.memberId,
+          plan: membership.plan.name,
+          validUntil: formatDate(membership.endDate),
+          receiptNo: payment?.invoice?.invoiceNumber ?? '—',
+          paidDate: formatDate(payment?.paidAt ?? new Date()),
+          mode: payment ? PAYMENT_MODE_LABELS[payment.mode] : '—',
+          amount: rupees(payment?.amountPaise ?? 0),
+          balance: rupees(balance.balanceDuePaise),
+        },
+      });
+    } catch (error) {
+      log.error({ err: error, membershipId }, 'Renewal email failed to queue');
+    }
   }
 
   /** Memberships expiring within N days — drives reminders and the KPI card. */

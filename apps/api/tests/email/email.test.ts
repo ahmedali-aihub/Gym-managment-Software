@@ -158,3 +158,42 @@ describe('MockEmailProvider', () => {
     expect(result.ok).toBe(true);
   });
 });
+
+describe('receipt email defaults', () => {
+  const receipt = EMAIL_TEMPLATES[EmailTemplateKey.RECEIPT];
+  // What a payment logged before the plan/validity rows existed carried.
+  const older = {
+    name: 'Rahul',
+    memberId: '6374',
+    receiptNo: 'RCPT/2026-27/0002',
+    paidDate: '24/10/2026',
+    mode: 'UPI',
+    amount: '3,000',
+    balance: '0',
+    // Gym identity, which the email service always merges in itself.
+    gymName: 'A to Z Fitness',
+    gymPhone: '+91 93912 10744',
+    gymAddress: 'Mehdipatnam, Hyderabad, Telangana 500028',
+    gymEmail: 'info@atozfitness.in',
+  };
+
+  it('fills headline, intro, plan and validity when a caller leaves them out', () => {
+    const merged = { ...receipt.defaults, ...older };
+    for (const part of [receipt.body, receipt.text, receipt.subject]) {
+      expect(renderEmailTemplate(part, merged)).not.toMatch(/\{\{\w+\}\}/);
+    }
+    expect(renderEmailTemplate(receipt.text, merged, false)).toContain('Payment received');
+  });
+
+  it('reads as a renewal when the renewal headline and intro are passed', () => {
+    const text = renderEmailTemplate(
+      receipt.text,
+      { ...receipt.defaults, ...older, headline: 'Membership renewed', intro: 'thank you for renewing your membership.', plan: 'FITNESS 3M', validUntil: '12/04/2027' },
+      false,
+    );
+    expect(text).toContain('Membership renewed');
+    expect(text).toContain('thank you for renewing your membership.');
+    expect(text).toContain('FITNESS 3M');
+    expect(text).toContain('12/04/2027');
+  });
+});
