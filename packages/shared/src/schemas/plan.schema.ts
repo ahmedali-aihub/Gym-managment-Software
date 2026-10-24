@@ -120,7 +120,9 @@ export const renewMembershipSchema = z.object({
     reference: z.string().trim().max(100).optional(),
     notes: z.string().trim().max(500).optional(),
   }),
-  sendSms: z.boolean().default(true),
+  // Opt-in, as on registration: Indian SMS needs DLT registration to be
+  // delivered at all. The member is told by email and WhatsApp instead.
+  sendSms: z.boolean().default(false),
 });
 
 export type RenewMembershipInput = z.infer<typeof renewMembershipSchema>;
