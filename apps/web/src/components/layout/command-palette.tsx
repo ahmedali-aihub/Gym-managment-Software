@@ -4,6 +4,7 @@ import { Command } from 'cmdk';
 import {
   BarChart3,
   CreditCard,
+  IdCard,
   Dumbbell,
   LayoutDashboard,
   Loader2,
@@ -218,6 +219,11 @@ export function CommandPalette() {
               icon={Users}
               label="Members"
               onSelect={() => run(() => navigate('/members'))}
+            />
+            <PaletteItem
+              icon={IdCard}
+              label="Memberships"
+              onSelect={() => run(() => navigate('/memberships'))}
             />
             <PaletteItem
               icon={CreditCard}

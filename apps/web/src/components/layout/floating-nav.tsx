@@ -14,6 +14,7 @@ import {
   ChatCircleDots,
   Desktop,
   Gear,
+  IdentificationCard,
   Key,
   MagnifyingGlass,
   Moon,
@@ -65,6 +66,13 @@ const NAV_ITEMS: NavItem[] = [
     roles: [Role.OWNER, Role.MANAGER],
   },
   { to: '/members', label: 'Members', icon: UsersThree },
+  // Every membership, newest first — who joined or renewed, and when.
+  {
+    to: '/memberships',
+    label: 'Memberships',
+    icon: IdentificationCard,
+    roles: [Role.OWNER, Role.MANAGER, Role.RECEPTIONIST],
+  },
   // Check-in IS a QR scan at the desk.
   { to: '/check-in', label: 'Check-in', icon: QrCode },
   // Money in (mostly cash and UPI, rarely cards) vs money out (bills).
@@ -190,9 +198,10 @@ export function FloatingNav() {
               height={64}
             />
           </span>
-          {/* Shown from `xl` up, alongside the nav labels. Below that the
-              logo alone identifies the gym. */}
-          <span className="hidden whitespace-nowrap text-[13px] font-semibold tracking-tight xl:block">
+          {/* Shown from `2xl` up. From `xl` the nav labels need the room —
+              with Memberships added, name and labels together overflowed a
+              1280px screen — and the logo alone identifies the gym. */}
+          <span className="hidden whitespace-nowrap text-[13px] font-semibold tracking-tight 2xl:block">
             A to Z Fitness
           </span>
         </button>
@@ -420,8 +429,12 @@ function NavRail({ items }: { items: NavItem[] }) {
   const handleX = useMotionValue(0);
 
   const activeIndex = React.useMemo(() => {
-    const found = items.findIndex((item) =>
-      location.pathname.startsWith(item.to),
+    // The path itself or a page under it — not any path that merely starts
+    // with the same letters, or /memberships would light up Members.
+    const found = items.findIndex(
+      (item) =>
+        location.pathname === item.to ||
+        location.pathname.startsWith(`${item.to}/`),
     );
     return found === -1 ? null : found;
   }, [items, location.pathname]);
@@ -669,7 +682,9 @@ const NavPill = React.forwardRef<
       // would otherwise steal the capture and drop the gesture.
       style={dragging ? { pointerEvents: 'none' } : undefined}
       className={cn(
-        'relative flex h-9 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium',
+        // A touch narrower below `xl`, where items are icons only: nine of
+        // them at full padding overflowed a 640px screen.
+        'relative flex h-9 items-center gap-1.5 rounded-full px-2.5 text-[13px] font-medium xl:px-3',
         'transition-colors duration-200',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         // Every item ALWAYS renders its own icon and label — nothing is ever
