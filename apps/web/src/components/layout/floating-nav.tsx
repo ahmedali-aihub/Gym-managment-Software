@@ -742,8 +742,14 @@ const MOBILE_TABS = [
   { to: '/dashboard', label: 'Dashboard', shortLabel: 'Home', icon: SquaresFour, roles: MANAGEMENT },
   { to: '/check-in', label: 'Check-in', icon: QrCode, roles: [Role.RECEPTIONIST, Role.TRAINER] },
   { to: '/members', label: 'Members', icon: UsersThree },
+  // In place of Messages, which moves to the account menu's More section.
+  {
+    to: '/memberships',
+    label: 'Memberships',
+    icon: IdentificationCard,
+    roles: [Role.OWNER, Role.MANAGER, Role.RECEPTIONIST],
+  },
   { to: '/payments', label: 'Payments', icon: Wallet },
-  { to: '/messages', label: 'Messages', icon: ChatCircleDots },
   { to: '/reports', label: 'Reports', icon: ChartLineUp, roles: MANAGEMENT },
 ].map((tab) => ({ ...tab, activeIcon: filled(tab.icon) }));
 
