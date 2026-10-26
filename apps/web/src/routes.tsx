@@ -46,6 +46,11 @@ const PaymentsPage = React.lazy(() =>
     default: m.PaymentsPage,
   })),
 );
+const MembershipsPage = React.lazy(() =>
+  import('@/features/memberships/memberships-page').then((m) => ({
+    default: m.MembershipsPage,
+  })),
+);
 const PlansPage = React.lazy(() =>
   import('@/features/plans/plans-page').then((m) => ({ default: m.PlansPage })),
 );
@@ -251,6 +256,7 @@ export const router = createBrowserRouter([
       { path: 'members/import', element: lazyRoute(ImportPage, MANAGEMENT) },
       { path: 'members/:id', element: lazyRoute(MemberProfilePage) },
       { path: 'payments', element: lazyRoute(PaymentsPage) },
+      { path: 'memberships', element: lazyRoute(MembershipsPage, FRONT_DESK) },
       { path: 'plans', element: lazyRoute(PlansPage, MANAGEMENT) },
       { path: 'check-in', element: lazyRoute(CheckInPage) },
       { path: 'messages', element: lazyRoute(MessagesPage) },
