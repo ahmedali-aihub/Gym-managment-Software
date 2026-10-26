@@ -63,17 +63,33 @@ const KIND_VARIANTS: Record<
   IMPORTED: 'outline',
 };
 
-const STATUS_VARIANTS: Record<
-  MembershipStatus,
-  'success' | 'secondary' | 'info' | 'destructive' | 'outline'
-> = {
-  ACTIVE: 'success',
-  EXPIRED: 'secondary',
-  FROZEN: 'info',
-  CANCELLED: 'destructive',
-  UPGRADED: 'outline',
-  TRANSFERRED: 'outline',
+/**
+ * Status as a solid pill, so the two that matter read at a glance across a
+ * long list: Active in a clear green, Expired in red — brighter than the
+ * app's muted status tints, at the owner's request, and with white text
+ * dark enough on both to stay legible in light and dark mode.
+ */
+const STATUS_PILL: Record<MembershipStatus, string> = {
+  ACTIVE: 'bg-emerald-600 text-white',
+  EXPIRED: 'bg-red-600 text-white',
+  FROZEN: 'bg-info/15 text-info',
+  CANCELLED: 'bg-muted text-muted-foreground',
+  UPGRADED: 'bg-muted text-muted-foreground',
+  TRANSFERRED: 'bg-muted text-muted-foreground',
 };
+
+function StatusPill({ status }: { status: MembershipStatus }) {
+  return (
+    <span
+      className={cn(
+        'inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] font-semibold leading-4',
+        STATUS_PILL[status],
+      )}
+    >
+      {MEMBERSHIP_STATUS_LABELS[status]}
+    </span>
+  );
+}
 
 /**
  * Memberships — every membership, newest first.
@@ -347,9 +363,7 @@ export function MembershipsPage() {
                         </Badge>
                       </td>
                       <td className="px-4 py-3">
-                        <Badge variant={STATUS_VARIANTS[row.status]} dot size="sm">
-                          {MEMBERSHIP_STATUS_LABELS[row.status]}
-                        </Badge>
+                        <StatusPill status={row.status} />
                       </td>
                       <td className="px-4 py-3 text-right">
                         <Money row={row} />
@@ -388,8 +402,9 @@ export function MembershipsPage() {
                         {KIND_LABELS[row.kind]}
                       </Badge>
                     </div>
-                    <div className="mt-0.5 truncate text-xs text-muted-foreground">
-                      {row.plan.name} · {MEMBERSHIP_STATUS_LABELS[row.status]}
+                    <div className="mt-1 flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+                      <span className="truncate">{row.plan.name}</span>
+                      <StatusPill status={row.status} />
                     </div>
                     <div className="tabular mt-0.5 truncate text-xs text-muted-foreground">
                       {formatDate(row.startDate)} – {formatDate(row.endDate)}
