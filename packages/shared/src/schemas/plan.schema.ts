@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { PlanType } from '../types/enums.js';
+import { MembershipStatus, PlanType } from '../types/enums.js';
 import {
   cuidSchema,
   paginationSchema,
@@ -126,3 +126,54 @@ export const renewMembershipSchema = z.object({
 });
 
 export type RenewMembershipInput = z.infer<typeof renewMembershipSchema>;
+
+/**
+ * The Memberships page: every membership, newest first.
+ *
+ * `kind` separates sign-ups from renewals, read from the membership's
+ * history; imported ones carry no history and match neither. `since`
+ * narrows to memberships added today, this week or this month (IST).
+ */
+export const membershipQuerySchema = paginationSchema.extend({
+  search: z.string().trim().max(100).optional(),
+  status: z.nativeEnum(MembershipStatus).optional(),
+  kind: z.enum(['NEW', 'RENEWAL']).optional(),
+  since: z.enum(['today', 'week', 'month', 'all']).default('all'),
+});
+
+export type MembershipQuery = z.infer<typeof membershipQuerySchema>;
+
+/** How a membership came about, for the Memberships page. */
+export type MembershipKind = 'NEW' | 'RENEWAL' | 'UPGRADE' | 'TRANSFER' | 'IMPORTED';
+
+/** One row of the Memberships page. */
+export interface MembershipListItem {
+  id: string;
+  createdAt: string;
+  startDate: string;
+  endDate: string;
+  status: MembershipStatus;
+  kind: MembershipKind;
+  plan: { id: string; name: string; durationDays: number };
+  member: {
+    id: string;
+    memberId: string;
+    fullName: string;
+    phone: string;
+    gender: string;
+    photoUrl: string | null;
+  };
+  totalPaise: number;
+  /** Paid against this membership, net of refunds. */
+  paidPaise: number;
+  balancePaise: number;
+  /** Who entered it; null for imported history. */
+  addedBy: string | null;
+}
+
+/** Counts behind the Memberships page summary. */
+export interface MembershipActivity {
+  today: { total: number; new: number; renewals: number };
+  week: { total: number; new: number; renewals: number };
+  month: { total: number; new: number; renewals: number };
+}

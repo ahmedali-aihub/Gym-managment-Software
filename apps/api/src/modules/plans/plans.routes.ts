@@ -2,6 +2,7 @@ import {
   Role,
   createPlanSchema,
   freezeMembershipSchema,
+  membershipQuerySchema,
   planQuerySchema,
   renewMembershipSchema,
   transferMembershipSchema,
@@ -59,6 +60,21 @@ const membershipRouter = Router();
 membershipRouter.use(authenticate);
 
 membershipRouter.get('/expiring', asyncHandler(membershipsController.expiring));
+
+// The Memberships page: newest first, read-only. Front desk and up, as with
+// payments — it shows what was paid and owed.
+const FRONT_DESK = [Role.OWNER, Role.MANAGER, Role.RECEPTIONIST];
+membershipRouter.get(
+  '/',
+  requireRole(...FRONT_DESK),
+  validateQuery(membershipQuerySchema),
+  asyncHandler(membershipsController.list),
+);
+membershipRouter.get(
+  '/activity',
+  requireRole(...FRONT_DESK),
+  asyncHandler(membershipsController.activity),
+);
 
 membershipRouter.post(
   '/freeze',

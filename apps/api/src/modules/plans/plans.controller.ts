@@ -1,6 +1,7 @@
 import type {
   CreatePlanInput,
   FreezeMembershipInput,
+  MembershipQuery,
   RenewMembershipInput,
   TransferMembershipInput,
   UpdatePlanInput,
@@ -14,6 +15,7 @@ import {
   chatMessageOrNull,
   chatMessageService,
 } from '../../services/whatsapp/chat-message.service.js';
+import { membershipListService } from './membership-list.service.js';
 import { membershipsService } from './memberships.service.js';
 import { plansService, type PlanQueryParams } from './plans.service.js';
 
@@ -140,6 +142,19 @@ export const membershipsController = {
       actorFromRequest(req),
     );
     res.json({ success: true, data: result });
+  },
+
+  /** The Memberships page, newest first. */
+  async list(req: Request, res: Response): Promise<void> {
+    const result = await membershipListService.list(
+      req.query as unknown as MembershipQuery,
+    );
+    res.json({ success: true, ...result });
+  },
+
+  async activity(_req: Request, res: Response): Promise<void> {
+    const activity = await membershipListService.activity();
+    res.json({ success: true, data: activity });
   },
 
   async expiring(req: Request, res: Response): Promise<void> {
