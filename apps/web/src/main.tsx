@@ -11,7 +11,7 @@ import { router } from '@/routes';
 import '@/styles/globals.css';
 
 /**
- * Query defaults.
+ * Query defaults..
  *
  * `retry` deliberately skips 4xx: a 404 or a 403 will return the same answer
  * however many times it is asked, and retrying only delays the error state
