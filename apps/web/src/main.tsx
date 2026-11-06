@@ -15,7 +15,7 @@ import '@/styles/globals.css';
  *
  * `retry` deliberately skips 4xx: a 404 or a 403 will return the same answer
  * however many times it is asked, and retrying only delays the error state
- * the user needs to see..
+ * the user needs to see.
  */
 const queryClient = new QueryClient({
   defaultOptions: {
