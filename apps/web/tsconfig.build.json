@@ -1,5 +1,5 @@
 {
-  // Build config for deployment.
+  // Build config for deployment..
   //
   // Identical to tsconfig.json except it excludes test files. The base
   // config's "include": ["src"] pulls in every *.test.ts alongside app
