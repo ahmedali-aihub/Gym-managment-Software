@@ -14,7 +14,7 @@ export default defineConfig({
     pool: 'forks',
     poolOptions: { forks: { singleFork: true } },
 
-    /***
+    /**
      * 20s rather than Vitest's 5s default.
      *
      * The HTTP smoke suite boots the entire Express app — nine route modules,
