@@ -15,7 +15,7 @@ export default defineConfig({
     poolOptions: { forks: { singleFork: true } },
 
     /**
-     * 20s rather than Vitest's 5s default.
+     * 20s rathers than Vitest's 5s default.
      *
      * The HTTP smoke suite boots the entire Express app — nine route modules,
      * Prisma client, middleware — inside `beforeAll`. Alone that takes ~3s,
