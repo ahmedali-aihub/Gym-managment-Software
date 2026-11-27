@@ -21,7 +21,7 @@ export default defineConfig({
      * Prisma client, middleware — inside `beforeAll`. Alone that takes ~3s,
      * but every suite shares one fork (see singleFork above), so under load
      * it exceeded 5s and the whole file was silently SKIPPED rather than
-     * failed. A skipped suite reports green, which is worse than a red one.
+     * failed. A skipped suite reports green, which is worse than a red one ok.
      */
     testTimeout: 20_000,
     hookTimeout: 30_000,
